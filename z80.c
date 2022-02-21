@@ -40,10 +40,35 @@ static const uint8_t cyc_ddfd[256] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4,
     15, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 10, 4, 4, 4, 4,
     4, 4};
 
+enum z80_flagbit {
+    cf = 0,
+    nf = 1,
+    pf = 2,
+    xf = 3,
+    hf = 4,
+    yf = 5,
+    zf = 6,
+    sf = 7
+};
+
+
 // MARK: helpers
 
 // get bit "n" of number "val"
 #define GET_BIT(n, val) (((val) >> (n)) & 1)
+
+static inline uint8_t flag_val(enum z80_flagbit bit, bool cond) {
+	return (!!cond) << bit;
+}
+
+static inline bool flag_get(z80* const z, enum z80_flagbit bit) {
+	return !!(z->f & (1 << bit));
+}
+
+static inline void flag_set(z80* const z, enum z80_flagbit bit, bool val) {
+	z->f &= ~(1<<bit);
+	z->f |= (!!val) << bit;
+}
 
 static inline uint8_t rb(z80* const z, uint16_t addr) {
   return z->read_byte(z->userdata, addr);
@@ -110,27 +135,11 @@ static inline void set_hl(z80* const z, uint16_t val) {
 }
 
 static inline uint8_t get_f(z80* const z) {
-  uint8_t val = 0;
-  val |= z->cf << 0;
-  val |= z->nf << 1;
-  val |= z->pf << 2;
-  val |= z->xf << 3;
-  val |= z->hf << 4;
-  val |= z->yf << 5;
-  val |= z->zf << 6;
-  val |= z->sf << 7;
-  return val;
+  return z->f;
 }
 
 static inline void set_f(z80* const z, uint8_t val) {
-  z->cf = (val >> 0) & 1;
-  z->nf = (val >> 1) & 1;
-  z->pf = (val >> 2) & 1;
-  z->xf = (val >> 3) & 1;
-  z->hf = (val >> 4) & 1;
-  z->yf = (val >> 5) & 1;
-  z->zf = (val >> 6) & 1;
-  z->sf = (val >> 7) & 1;
+  z->f = val;
 }
 
 // increments R, keeping the highest byte intact
@@ -226,33 +235,34 @@ static inline void cond_jr(z80* const z, bool condition) {
 // ADD Byte: adds two bytes together
 static inline uint8_t addb(z80* const z, uint8_t a, uint8_t b, bool cy) {
   const uint8_t result = a + b + cy;
-  z->sf = result >> 7;
-  z->zf = result == 0;
-  z->hf = carry(4, a, b, cy);
-  z->pf = carry(7, a, b, cy) != carry(8, a, b, cy);
-  z->cf = carry(8, a, b, cy);
-  z->nf = 0;
-  z->xf = GET_BIT(3, result);
-  z->yf = GET_BIT(5, result);
+  z->f = 0 |
+    flag_val(sf, result >> 7) |
+    flag_val(zf, result == 0) |
+    flag_val(hf, carry(4, a, b, cy)) |
+    flag_val(pf, carry(7, a, b, cy) != carry(8, a, b, cy)) |
+    flag_val(cf, carry(8, a, b, cy)) |
+    flag_val(nf, 0) |
+    flag_val(xf, GET_BIT(3, result)) |
+    flag_val(yf, GET_BIT(5, result));
   return result;
 }
 
 // SUBstract Byte: substracts two bytes (with optional carry)
 static inline uint8_t subb(z80* const z, uint8_t a, uint8_t b, bool cy) {
   uint8_t val = addb(z, a, ~b, !cy);
-  z->cf = !z->cf;
-  z->hf = !z->hf;
-  z->nf = 1;
+  flag_set(z, cf, !flag_get(z, cf));
+  flag_set(z, hf, !flag_get(z, hf));
+  flag_set(z, nf, 1);
   return val;
 }
 
 // ADD Word: adds two words together
 static inline uint16_t addw(z80* const z, uint16_t a, uint16_t b, bool cy) {
   uint8_t lsb = addb(z, a, b, cy);
-  uint8_t msb = addb(z, a >> 8, b >> 8, z->cf);
+  uint8_t msb = addb(z, a >> 8, b >> 8, flag_get(z, cf));
 
   uint16_t result = (msb << 8) | lsb;
-  z->zf = result == 0;
+  flag_set(z, zf, result == 0);
   z->mem_ptr = a + 1;
   return result;
 }
@@ -260,67 +270,67 @@ static inline uint16_t addw(z80* const z, uint16_t a, uint16_t b, bool cy) {
 // SUBstract Word: substracts two words (with optional carry)
 static inline uint16_t subw(z80* const z, uint16_t a, uint16_t b, bool cy) {
   uint8_t lsb = subb(z, a, b, cy);
-  uint8_t msb = subb(z, a >> 8, b >> 8, z->cf);
+  uint8_t msb = subb(z, a >> 8, b >> 8, flag_get(z, cf));
 
   uint16_t result = (msb << 8) | lsb;
-  z->zf = result == 0;
+  flag_set(z, zf, result == 0);
   z->mem_ptr = a + 1;
   return result;
 }
 
 // adds a word to HL
 static inline void addhl(z80* const z, uint16_t val) {
-  bool sf = z->sf;
-  bool zf = z->zf;
-  bool pf = z->pf;
+  bool sfc = flag_get(z, sf);
+  bool zfc = flag_get(z, zf);
+  bool pfc = flag_get(z, pf);
   uint16_t result = addw(z, get_hl(z), val, 0);
   set_hl(z, result);
-  z->sf = sf;
-  z->zf = zf;
-  z->pf = pf;
+  flag_set(z, sf, sfc);
+  flag_set(z, zf, zfc);
+  flag_set(z, pf, pfc);
 }
 
 // adds a word to IX or IY
 static inline void addiz(z80* const z, uint16_t* reg, uint16_t val) {
-  bool sf = z->sf;
-  bool zf = z->zf;
-  bool pf = z->pf;
+  bool sfc = flag_get(z, sf);
+  bool zfc = flag_get(z, zf);
+  bool pfc = flag_get(z, pf);
   uint16_t result = addw(z, *reg, val, 0);
   *reg = result;
-  z->sf = sf;
-  z->zf = zf;
-  z->pf = pf;
+  flag_set(z, sf, sfc);
+  flag_set(z, zf, zfc);
+  flag_set(z, pf, pfc);
 }
 
 // adds a word (+ carry) to HL
 static inline void adchl(z80* const z, uint16_t val) {
-  uint16_t result = addw(z, get_hl(z), val, z->cf);
-  z->sf = result >> 15;
-  z->zf = result == 0;
+  uint16_t result = addw(z, get_hl(z), val, flag_get(z, cf));
+  flag_set(z, sf, result >> 15);
+  flag_set(z, zf, result == 0);
   set_hl(z, result);
 }
 
 // substracts a word (+ carry) to HL
 static inline void sbchl(z80* const z, uint16_t val) {
-  const uint16_t result = subw(z, get_hl(z), val, z->cf);
-  z->sf = result >> 15;
-  z->zf = result == 0;
+  const uint16_t result = subw(z, get_hl(z), val, flag_get(z, cf));
+  flag_set(z, sf, result >> 15);
+  flag_set(z, zf, result == 0);
   set_hl(z, result);
 }
 
 // increments a byte value
 static inline uint8_t inc(z80* const z, uint8_t a) {
-  bool cf = z->cf;
+  bool cfc = flag_get(z, cf);
   uint8_t result = addb(z, a, 1, 0);
-  z->cf = cf;
+  flag_set(z, cf, cfc);
   return result;
 }
 
 // decrements a byte value
 static inline uint8_t dec(z80* const z, uint8_t a) {
-  bool cf = z->cf;
+  bool cfc = flag_get(z, cf);
   uint8_t result = subb(z, a, 1, 0);
-  z->cf = cf;
+  flag_set(z, cf, cfc);
   return result;
 }
 
@@ -330,14 +340,15 @@ static inline uint8_t dec(z80* const z, uint8_t a) {
 // result in register A
 static inline void land(z80* const z, uint8_t val) {
   const uint8_t result = z->a & val;
-  z->sf = result >> 7;
-  z->zf = result == 0;
-  z->hf = 1;
-  z->pf = parity(result);
-  z->nf = 0;
-  z->cf = 0;
-  z->xf = GET_BIT(3, result);
-  z->yf = GET_BIT(5, result);
+  z->f = 0 |
+    flag_val(sf, result >> 7) |
+    flag_val(zf, result == 0) |
+    flag_val(hf,  1) |
+    flag_val(pf, parity(result)) |
+    flag_val(nf, 0) |
+    flag_val(cf, 0) |
+    flag_val(xf, GET_BIT(3, result)) |
+    flag_val(yf, GET_BIT(5, result));
   z->a = result;
 }
 
@@ -345,14 +356,15 @@ static inline void land(z80* const z, uint8_t val) {
 // result in register A
 static inline void lxor(z80* const z, const uint8_t val) {
   const uint8_t result = z->a ^ val;
-  z->sf = result >> 7;
-  z->zf = result == 0;
-  z->hf = 0;
-  z->pf = parity(result);
-  z->nf = 0;
-  z->cf = 0;
-  z->xf = GET_BIT(3, result);
-  z->yf = GET_BIT(5, result);
+  z->f = 0 |
+    flag_val(sf, result >> 7) |
+    flag_val(zf, result == 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(result)) |
+    flag_val(nf, 0) |
+    flag_val(cf, 0) |
+    flag_val(xf, GET_BIT(3, result)) |
+    flag_val(yf, GET_BIT(5, result));
   z->a = result;
 }
 
@@ -360,14 +372,15 @@ static inline void lxor(z80* const z, const uint8_t val) {
 // result in register A
 static inline void lor(z80* const z, const uint8_t val) {
   const uint8_t result = z->a | val;
-  z->sf = result >> 7;
-  z->zf = result == 0;
-  z->hf = 0;
-  z->pf = parity(result);
-  z->nf = 0;
-  z->cf = 0;
-  z->xf = GET_BIT(3, result);
-  z->yf = GET_BIT(5, result);
+  z->f = 0 |
+    flag_val(sf, result >> 7) |
+    flag_val(zf, result == 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(result)) |
+    flag_val(nf, 0) |
+    flag_val(cf, 0) |
+    flag_val(xf, GET_BIT(3, result)) |
+    flag_val(yf, GET_BIT(5, result));
   z->a = result;
 }
 
@@ -378,8 +391,8 @@ static inline void cp(z80* const z, const uint8_t val) {
   // the only difference between cp and sub is that
   // the xf/yf are taken from the value to be substracted,
   // not the result
-  z->yf = GET_BIT(5, val);
-  z->xf = GET_BIT(3, val);
+  flag_set(z, yf, GET_BIT(5, val));
+  flag_set(z, xf, GET_BIT(3, val));
 }
 
 // 0xCB opcodes
@@ -387,14 +400,15 @@ static inline void cp(z80* const z, const uint8_t val) {
 static inline uint8_t cb_rlc(z80* const z, uint8_t val) {
   const bool old = val >> 7;
   val = (val << 1) | old;
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->pf = parity(val);
-  z->nf = 0;
-  z->hf = 0;
-  z->cf = old;
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(cf, old) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
@@ -402,114 +416,129 @@ static inline uint8_t cb_rlc(z80* const z, uint8_t val) {
 static inline uint8_t cb_rrc(z80* const z, uint8_t val) {
   const bool old = val & 1;
   val = (val >> 1) | (old << 7);
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->cf = old;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(cf, old) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // rotate left (simple)
 static inline uint8_t cb_rl(z80* const z, uint8_t val) {
-  const bool cf = z->cf;
-  z->cf = val >> 7;
-  val = (val << 1) | cf;
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  const bool cfc = flag_get(z, cf);
+  const bool cfn = val >> 7;
+  val = (val << 1) | cfc;
+  z->f = 0 |
+    flag_val(cf, cfn) |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // rotate right (simple)
 static inline uint8_t cb_rr(z80* const z, uint8_t val) {
-  const bool c = z->cf;
-  z->cf = val & 1;
+  const bool c = flag_get(z, cf);
+  const bool cfn = val & 1;
   val = (val >> 1) | (c << 7);
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(cf, cfn) |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // shift left preserving sign
 static inline uint8_t cb_sla(z80* const z, uint8_t val) {
-  z->cf = val >> 7;
+  const bool cfn = val >> 7;
   val <<= 1;
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(cf, cfn) |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // SLL (exactly like SLA, but sets the first bit to 1)
 static inline uint8_t cb_sll(z80* const z, uint8_t val) {
-  z->cf = val >> 7;
+  const bool cfn = val >> 7;
   val <<= 1;
   val |= 1;
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(cf, cfn) |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // shift right preserving sign
 static inline uint8_t cb_sra(z80* const z, uint8_t val) {
-  z->cf = val & 1;
+  const bool cfn = val & 1;
   val = (val >> 1) | (val & 0x80); // 0b10000000
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(cf, cfn) |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // shift register right
 static inline uint8_t cb_srl(z80* const z, uint8_t val) {
-  z->cf = val & 1;
+  const bool cfn = val & 1;
   val >>= 1;
-  z->sf = val >> 7;
-  z->zf = val == 0;
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = parity(val);
-  z->xf = GET_BIT(3, val);
-  z->yf = GET_BIT(5, val);
+  z->f = 0 |
+    flag_val(cf, cfn) |
+    flag_val(sf, val >> 7) |
+    flag_val(zf, val == 0) |
+    flag_val(nf, 0) |
+    flag_val(hf, 0) |
+    flag_val(pf, parity(val)) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(yf, GET_BIT(5, val));
   return val;
 }
 
 // tests bit "n" from a byte
 static inline uint8_t cb_bit(z80* const z, uint8_t val, uint8_t n) {
   const uint8_t result = val & (1 << n);
-  z->sf = result >> 7;
-  z->zf = result == 0;
-  z->yf = GET_BIT(5, val);
-  z->hf = 1;
-  z->xf = GET_BIT(3, val);
-  z->pf = z->zf;
-  z->nf = 0;
+  z->f = 0 |
+    flag_val(cf, flag_get(z, cf)) | /* original code didn't set this one, so use old value */
+    flag_val(sf, result >> 7) |
+    flag_val(zf, result == 0) |
+    flag_val(yf, GET_BIT(5, val)) |
+    flag_val(hf, 1) |
+    flag_val(xf, GET_BIT(3, val)) |
+    flag_val(pf, result == 0) |
+    flag_val(nf, 0);
   return result;
 }
 
@@ -527,12 +556,12 @@ static inline void ldi(z80* const z) {
   // see https://wikiti.brandonw.net/index.php?title=Z80_Instruction_Set
   // for the calculation of xf/yf on LDI
   const uint8_t result = val + z->a;
-  z->xf = GET_BIT(3, result);
-  z->yf = GET_BIT(1, result);
+  flag_set(z, xf, GET_BIT(3, result));
+  flag_set(z, yf, GET_BIT(1, result));
 
-  z->nf = 0;
-  z->hf = 0;
-  z->pf = get_bc(z) > 0;
+  flag_set(z, nf, 0);
+  flag_set(z, hf, 0);
+  flag_set(z, pf, get_bc(z) > 0);
 }
 
 static inline void ldd(z80* const z) {
@@ -543,14 +572,15 @@ static inline void ldd(z80* const z) {
 }
 
 static inline void cpi(z80* const z) {
-  bool cf = z->cf;
+  bool cfc = flag_get(z, cf);
   const uint8_t result = subb(z, z->a, rb(z, get_hl(z)), 0);
   set_hl(z, get_hl(z) + 1);
   set_bc(z, get_bc(z) - 1);
-  z->xf = GET_BIT(3, result - z->hf);
-  z->yf = GET_BIT(1, result - z->hf);
-  z->pf = get_bc(z) != 0;
-  z->cf = cf;
+  bool hfc = flag_get(z, hf);
+  flag_set(z, xf, GET_BIT(3, result - hfc));
+  flag_set(z, yf, GET_BIT(1, result - hfc));
+  flag_set(z, pf, get_bc(z) != 0);
+  flag_set(z, cf, cfc);
   z->mem_ptr += 1;
 }
 
@@ -563,11 +593,11 @@ static inline void cpd(z80* const z) {
 
 static void in_r_c(z80* const z, uint8_t* r) {
   *r = z->port_in(z, z->c);
-  z->zf = *r == 0;
-  z->sf = *r >> 7;
-  z->pf = parity(*r);
-  z->nf = 0;
-  z->hf = 0;
+  flag_set(z, zf, *r == 0);
+  flag_set(z, sf, *r >> 7);
+  flag_set(z, pf, parity(*r));
+  flag_set(z, nf, 0);
+  flag_set(z, hf, 0);
 }
 
 static void ini(z80* const z) {
@@ -575,8 +605,8 @@ static void ini(z80* const z) {
   wb(z, get_hl(z), val);
   set_hl(z, get_hl(z) + 1);
   z->b -= 1;
-  z->zf = z->b == 0;
-  z->nf = 1;
+  flag_set(z, zf, z->b == 0);
+  flag_set(z, nf, 1);
   z->mem_ptr = get_bc(z) + 1;
 }
 
@@ -590,8 +620,8 @@ static void outi(z80* const z) {
   z->port_out(z, z->c, rb(z, get_hl(z)));
   set_hl(z, get_hl(z) + 1);
   z->b -= 1;
-  z->zf = z->b == 0;
-  z->nf = 1;
+  flag_set(z, zf, z->b == 0);
+  flag_set(z, nf, 1);
   z->mem_ptr = get_bc(z) + 1;
 }
 
@@ -612,29 +642,29 @@ static void daa(z80* const z) {
   // > http://z80-heaven.wikidot.com/instructions-set:daa
   uint8_t correction = 0;
 
-  if ((z->a & 0x0F) > 0x09 || z->hf) {
+  if ((z->a & 0x0F) > 0x09 || flag_get(z, hf)) {
     correction += 0x06;
   }
 
-  if (z->a > 0x99 || z->cf) {
+  if (z->a > 0x99 || flag_get(z, cf)) {
     correction += 0x60;
-    z->cf = 1;
+    flag_set(z, cf, 1);
   }
 
-  const bool substraction = z->nf;
+  const bool substraction = flag_get(z, nf);
   if (substraction) {
-    z->hf = z->hf && (z->a & 0x0F) < 0x06;
+    flag_set(z, hf, flag_get(z, hf) && (z->a & 0x0F) < 0x06);
     z->a -= correction;
   } else {
-    z->hf = (z->a & 0x0F) > 0x09;
+    flag_set(z, hf, (z->a & 0x0F) > 0x09);
     z->a += correction;
   }
 
-  z->sf = z->a >> 7;
-  z->zf = z->a == 0;
-  z->pf = parity(z->a);
-  z->xf = GET_BIT(3, z->a);
-  z->yf = GET_BIT(5, z->a);
+  flag_set(z, sf, z->a >> 7);
+  flag_set(z, zf, z->a == 0);
+  flag_set(z, pf, parity(z->a));
+  flag_set(z, xf, GET_BIT(3, z->a));
+  flag_set(z, yf, GET_BIT(5, z->a));
 }
 
 static inline uint16_t displace(
@@ -720,6 +750,7 @@ void z80_init(z80* const z) {
   // af and sp are set to 0xFFFF after reset,
   // and the other values are undefined (z80-documented)
   z->a = 0xFF;
+  z->f = 0xFF;
   z->b = 0;
   z->c = 0;
   z->d = 0;
@@ -738,15 +769,6 @@ void z80_init(z80* const z) {
 
   z->i = 0;
   z->r = 0;
-
-  z->sf = 1;
-  z->zf = 1;
-  z->yf = 1;
-  z->hf = 1;
-  z->xf = 1;
-  z->pf = 1;
-  z->nf = 1;
-  z->cf = 1;
 
   z->iff_delay = 0;
   z->interrupt_mode = 0;
@@ -956,15 +978,15 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x86: z->a = addb(z, z->a, rb(z, get_hl(z)), 0); break; // add a,(hl)
   case 0xC6: z->a = addb(z, z->a, nextb(z), 0); break; // add a,*
 
-  case 0x8F: z->a = addb(z, z->a, z->a, z->cf); break; // adc a,a
-  case 0x88: z->a = addb(z, z->a, z->b, z->cf); break; // adc a,b
-  case 0x89: z->a = addb(z, z->a, z->c, z->cf); break; // adc a,c
-  case 0x8A: z->a = addb(z, z->a, z->d, z->cf); break; // adc a,d
-  case 0x8B: z->a = addb(z, z->a, z->e, z->cf); break; // adc a,e
-  case 0x8C: z->a = addb(z, z->a, z->h, z->cf); break; // adc a,h
-  case 0x8D: z->a = addb(z, z->a, z->l, z->cf); break; // adc a,l
-  case 0x8E: z->a = addb(z, z->a, rb(z, get_hl(z)), z->cf); break; // adc a,(hl)
-  case 0xCE: z->a = addb(z, z->a, nextb(z), z->cf); break; // adc a,*
+  case 0x8F: z->a = addb(z, z->a, z->a, flag_get(z, cf)); break; // adc a,a
+  case 0x88: z->a = addb(z, z->a, z->b, flag_get(z, cf)); break; // adc a,b
+  case 0x89: z->a = addb(z, z->a, z->c, flag_get(z, cf)); break; // adc a,c
+  case 0x8A: z->a = addb(z, z->a, z->d, flag_get(z, cf)); break; // adc a,d
+  case 0x8B: z->a = addb(z, z->a, z->e, flag_get(z, cf)); break; // adc a,e
+  case 0x8C: z->a = addb(z, z->a, z->h, flag_get(z, cf)); break; // adc a,h
+  case 0x8D: z->a = addb(z, z->a, z->l, flag_get(z, cf)); break; // adc a,l
+  case 0x8E: z->a = addb(z, z->a, rb(z, get_hl(z)), flag_get(z, cf)); break; // adc a,(hl)
+  case 0xCE: z->a = addb(z, z->a, nextb(z), flag_get(z, cf)); break; // adc a,*
 
   case 0x97: z->a = subb(z, z->a, z->a, 0); break; // sub a,a
   case 0x90: z->a = subb(z, z->a, z->b, 0); break; // sub a,b
@@ -976,15 +998,15 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x96: z->a = subb(z, z->a, rb(z, get_hl(z)), 0); break; // sub a,(hl)
   case 0xD6: z->a = subb(z, z->a, nextb(z), 0); break; // sub a,*
 
-  case 0x9F: z->a = subb(z, z->a, z->a, z->cf); break; // sbc a,a
-  case 0x98: z->a = subb(z, z->a, z->b, z->cf); break; // sbc a,b
-  case 0x99: z->a = subb(z, z->a, z->c, z->cf); break; // sbc a,c
-  case 0x9A: z->a = subb(z, z->a, z->d, z->cf); break; // sbc a,d
-  case 0x9B: z->a = subb(z, z->a, z->e, z->cf); break; // sbc a,e
-  case 0x9C: z->a = subb(z, z->a, z->h, z->cf); break; // sbc a,h
-  case 0x9D: z->a = subb(z, z->a, z->l, z->cf); break; // sbc a,l
-  case 0x9E: z->a = subb(z, z->a, rb(z, get_hl(z)), z->cf); break; // sbc a,(hl)
-  case 0xDE: z->a = subb(z, z->a, nextb(z), z->cf); break; // sbc a,*
+  case 0x9F: z->a = subb(z, z->a, z->a, flag_get(z, cf)); break; // sbc a,a
+  case 0x98: z->a = subb(z, z->a, z->b, flag_get(z, cf)); break; // sbc a,b
+  case 0x99: z->a = subb(z, z->a, z->c, flag_get(z, cf)); break; // sbc a,c
+  case 0x9A: z->a = subb(z, z->a, z->d, flag_get(z, cf)); break; // sbc a,d
+  case 0x9B: z->a = subb(z, z->a, z->e, flag_get(z, cf)); break; // sbc a,e
+  case 0x9C: z->a = subb(z, z->a, z->h, flag_get(z, cf)); break; // sbc a,h
+  case 0x9D: z->a = subb(z, z->a, z->l, flag_get(z, cf)); break; // sbc a,l
+  case 0x9E: z->a = subb(z, z->a, rb(z, get_hl(z)), flag_get(z, cf)); break; // sbc a,(hl)
+  case 0xDE: z->a = subb(z, z->a, nextb(z), flag_get(z, cf)); break; // sbc a,*
 
   case 0x09: addhl(z, get_bc(z)); break; // add hl,bc
   case 0x19: addhl(z, get_de(z)); break; // add hl,de
@@ -1037,64 +1059,64 @@ void exec_opcode(z80* const z, uint8_t opcode) {
 
   case 0x2F:
     z->a = ~z->a;
-    z->nf = 1;
-    z->hf = 1;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, nf, 1);
+    flag_set(z, hf, 1);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
     break; // cpl
 
   case 0x37:
-    z->cf = 1;
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, cf, 1);
+    flag_set(z, nf, 0);
+    flag_set(z, hf, 0);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
     break; // scf
 
   case 0x3F:
-    z->hf = z->cf;
-    z->cf = !z->cf;
-    z->nf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, hf, flag_get(z, cf));
+    flag_set(z, cf, !flag_get(z, cf));
+    flag_set(z, nf, 0);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
     break; // ccf
 
   case 0x07: {
-    z->cf = z->a >> 7;
-    z->a = (z->a << 1) | z->cf;
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, cf, z->a >> 7);
+    z->a = (z->a << 1) | flag_get(z, cf);
+    flag_set(z, nf, 0);
+    flag_set(z, hf, 0);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
   } break; // rlca (rotate left)
 
   case 0x0F: {
-    z->cf = z->a & 1;
-    z->a = (z->a >> 1) | (z->cf << 7);
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, cf, z->a & 1);
+    z->a = (z->a >> 1) | (flag_get(z, cf) << 7);
+    flag_set(z, nf, 0);
+    flag_set(z, hf, 0);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
   } break; // rrca (rotate right)
 
   case 0x17: {
-    const bool cy = z->cf;
-    z->cf = z->a >> 7;
+    const bool cy = flag_get(z, cf);
+    flag_set(z, cf, z->a >> 7);
     z->a = (z->a << 1) | cy;
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, nf, 0);
+    flag_set(z, hf, 0);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
   } break; // rla
 
   case 0x1F: {
-    const bool cy = z->cf;
-    z->cf = z->a & 1;
+    const bool cy = flag_get(z, cf);
+    flag_set(z, cf, z->a & 1);
     z->a = (z->a >> 1) | (cy << 7);
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
+    flag_set(z, nf, 0);
+    flag_set(z, hf, 0);
+    flag_set(z, xf, GET_BIT(3, z->a));
+    flag_set(z, yf, GET_BIT(5, z->a));
   } break; // rra
 
   case 0xA7: land(z, z->a); break; // and a
@@ -1138,43 +1160,43 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xFE: cp(z, nextb(z)); break; // cp *
 
   case 0xC3: jump(z, nextw(z)); break; // jm **
-  case 0xC2: cond_jump(z, z->zf == 0); break; // jp nz, **
-  case 0xCA: cond_jump(z, z->zf == 1); break; // jp z, **
-  case 0xD2: cond_jump(z, z->cf == 0); break; // jp nc, **
-  case 0xDA: cond_jump(z, z->cf == 1); break; // jp c, **
-  case 0xE2: cond_jump(z, z->pf == 0); break; // jp po, **
-  case 0xEA: cond_jump(z, z->pf == 1); break; // jp pe, **
-  case 0xF2: cond_jump(z, z->sf == 0); break; // jp p, **
-  case 0xFA: cond_jump(z, z->sf == 1); break; // jp m, **
+  case 0xC2: cond_jump(z, flag_get(z, zf) == 0); break; // jp nz, **
+  case 0xCA: cond_jump(z, flag_get(z, zf) == 1); break; // jp z, **
+  case 0xD2: cond_jump(z, flag_get(z, cf) == 0); break; // jp nc, **
+  case 0xDA: cond_jump(z, flag_get(z, cf) == 1); break; // jp c, **
+  case 0xE2: cond_jump(z, flag_get(z, pf) == 0); break; // jp po, **
+  case 0xEA: cond_jump(z, flag_get(z, pf) == 1); break; // jp pe, **
+  case 0xF2: cond_jump(z, flag_get(z, sf) == 0); break; // jp p, **
+  case 0xFA: cond_jump(z, flag_get(z, sf) == 1); break; // jp m, **
 
   case 0x10: cond_jr(z, --z->b != 0); break; // djnz *
   case 0x18: z->pc += (int8_t) nextb(z); break; // jr *
-  case 0x20: cond_jr(z, z->zf == 0); break; // jr nz, *
-  case 0x28: cond_jr(z, z->zf == 1); break; // jr z, *
-  case 0x30: cond_jr(z, z->cf == 0); break; // jr nc, *
-  case 0x38: cond_jr(z, z->cf == 1); break; // jr c, *
+  case 0x20: cond_jr(z, flag_get(z, zf) == 0); break; // jr nz, *
+  case 0x28: cond_jr(z, flag_get(z, zf) == 1); break; // jr z, *
+  case 0x30: cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
+  case 0x38: cond_jr(z, flag_get(z, cf) == 1); break; // jr c, *
 
   case 0xE9: z->pc = get_hl(z); break; // jp (hl)
   case 0xCD: call(z, nextw(z)); break; // call
 
-  case 0xC4: cond_call(z, z->zf == 0); break; // cnz
-  case 0xCC: cond_call(z, z->zf == 1); break; // cz
-  case 0xD4: cond_call(z, z->cf == 0); break; // cnc
-  case 0xDC: cond_call(z, z->cf == 1); break; // cc
-  case 0xE4: cond_call(z, z->pf == 0); break; // cpo
-  case 0xEC: cond_call(z, z->pf == 1); break; // cpe
-  case 0xF4: cond_call(z, z->sf == 0); break; // cp
-  case 0xFC: cond_call(z, z->sf == 1); break; // cm
+  case 0xC4: cond_call(z, flag_get(z, zf) == 0); break; // cnz
+  case 0xCC: cond_call(z, flag_get(z, zf) == 1); break; // cz
+  case 0xD4: cond_call(z, flag_get(z, cf) == 0); break; // cnc
+  case 0xDC: cond_call(z, flag_get(z, cf) == 1); break; // cc
+  case 0xE4: cond_call(z, flag_get(z, pf) == 0); break; // cpo
+  case 0xEC: cond_call(z, flag_get(z, pf) == 1); break; // cpe
+  case 0xF4: cond_call(z, flag_get(z, sf) == 0); break; // cp
+  case 0xFC: cond_call(z, flag_get(z, sf) == 1); break; // cm
 
   case 0xC9: ret(z); break; // ret
-  case 0xC0: cond_ret(z, z->zf == 0); break; // ret nz
-  case 0xC8: cond_ret(z, z->zf == 1); break; // ret z
-  case 0xD0: cond_ret(z, z->cf == 0); break; // ret nc
-  case 0xD8: cond_ret(z, z->cf == 1); break; // ret c
-  case 0xE0: cond_ret(z, z->pf == 0); break; // ret po
-  case 0xE8: cond_ret(z, z->pf == 1); break; // ret pe
-  case 0xF0: cond_ret(z, z->sf == 0); break; // ret p
-  case 0xF8: cond_ret(z, z->sf == 1); break; // ret m
+  case 0xC0: cond_ret(z, flag_get(z, zf) == 0); break; // ret nz
+  case 0xC8: cond_ret(z, flag_get(z, zf) == 1); break; // ret z
+  case 0xD0: cond_ret(z, flag_get(z, cf) == 0); break; // ret nc
+  case 0xD8: cond_ret(z, flag_get(z, cf) == 1); break; // ret c
+  case 0xE0: cond_ret(z, flag_get(z, pf) == 0); break; // ret po
+  case 0xE8: cond_ret(z, flag_get(z, pf) == 1); break; // ret pe
+  case 0xF0: cond_ret(z, flag_get(z, sf) == 0); break; // ret p
+  case 0xF8: cond_ret(z, flag_get(z, sf) == 1); break; // ret m
 
   case 0xC7: call(z, 0x00); break; // rst 0
   case 0xCF: call(z, 0x08); break; // rst 1
@@ -1271,18 +1293,18 @@ void exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
 
   case 0x84: z->a = addb(z, z->a, IZH, 0); break; // add a,izh
   case 0x85: z->a = addb(z, z->a, *iz & 0xFF, 0); break; // add a,izl
-  case 0x8C: z->a = addb(z, z->a, IZH, z->cf); break; // adc a,izh
-  case 0x8D: z->a = addb(z, z->a, *iz & 0xFF, z->cf); break; // adc a,izl
+  case 0x8C: z->a = addb(z, z->a, IZH, flag_get(z, cf)); break; // adc a,izh
+  case 0x8D: z->a = addb(z, z->a, *iz & 0xFF, flag_get(z, cf)); break; // adc a,izl
 
   case 0x86: z->a = addb(z, z->a, rb(z, IZD), 0); break; // add a,(iz+*)
-  case 0x8E: z->a = addb(z, z->a, rb(z, IZD), z->cf); break; // adc a,(iz+*)
+  case 0x8E: z->a = addb(z, z->a, rb(z, IZD), flag_get(z, cf)); break; // adc a,(iz+*)
   case 0x96: z->a = subb(z, z->a, rb(z, IZD), 0); break; // sub (iz+*)
-  case 0x9E: z->a = subb(z, z->a, rb(z, IZD), z->cf); break; // sbc (iz+*)
+  case 0x9E: z->a = subb(z, z->a, rb(z, IZD), flag_get(z, cf)); break; // sbc (iz+*)
 
   case 0x94: z->a = subb(z, z->a, IZH, 0); break; // sub izh
   case 0x95: z->a = subb(z, z->a, *iz & 0xFF, 0); break; // sub izl
-  case 0x9C: z->a = subb(z, z->a, IZH, z->cf); break; // sbc izh
-  case 0x9D: z->a = subb(z, z->a, *iz & 0xFF, z->cf); break; // sbc izl
+  case 0x9C: z->a = subb(z, z->a, IZH, flag_get(z, cf)); break; // sbc izh
+  case 0x9D: z->a = subb(z, z->a, *iz & 0xFF, flag_get(z, cf)); break; // sbc izl
 
   case 0xA6: land(z, rb(z, IZD)); break; // and (iz+*)
   case 0xA4: land(z, IZH); break; // and izh
@@ -1445,8 +1467,8 @@ void exec_opcode_cb(z80* const z, uint8_t opcode) {
 
     // in bit (hl), x/y flags are handled differently:
     if (z_ == 6) {
-      z->yf = GET_BIT(5, z->mem_ptr >> 8);
-      z->xf = GET_BIT(3, z->mem_ptr >> 8);
+      flag_set(z, yf, GET_BIT(5, z->mem_ptr >> 8));
+      flag_set(z, xf, GET_BIT(3, z->mem_ptr >> 8));
       z->cyc += 4;
     }
   } break;
@@ -1486,8 +1508,8 @@ void exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
   } break;
   case 1: {
     result = cb_bit(z, val, y_);
-    z->yf = GET_BIT(5, addr >> 8);
-    z->xf = GET_BIT(3, addr >> 8);
+    flag_set(z, yf, GET_BIT(5, addr >> 8));
+    flag_set(z, xf, GET_BIT(3, addr >> 8));
   } break; // bit y,(iz+d)
   case 2: result = val & ~(1 << y_); break; // res y, (iz+d)
   case 3: result = val | (1 << y_); break; // set y, (iz+d)
@@ -1531,20 +1553,20 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
 
   case 0x57:
     z->a = z->i;
-    z->sf = z->a >> 7;
-    z->zf = z->a == 0;
-    z->hf = 0;
-    z->nf = 0;
-    z->pf = z->iff2;
+    flag_set(z, sf, z->a >> 7);
+    flag_set(z, zf, z->a == 0);
+    flag_set(z, hf, 0);
+    flag_set(z, nf, 0);
+    flag_set(z, pf, z->iff2);
     break; // ld a,i
 
   case 0x5F:
     z->a = z->r;
-    z->sf = z->a >> 7;
-    z->zf = z->a == 0;
-    z->hf = 0;
-    z->nf = 0;
-    z->pf = z->iff2;
+    flag_set(z, sf, z->a >> 7);
+    flag_set(z, zf, z->a == 0);
+    flag_set(z, hf, 0);
+    flag_set(z, nf, 0);
+    flag_set(z, pf, z->iff2);
     break; // ld a,r
 
   case 0x45:
@@ -1585,7 +1607,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0xA9: cpd(z); break; // cpd
   case 0xB1: {
     cpi(z);
-    if (get_bc(z) != 0 && !z->zf) {
+    if (get_bc(z) != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
       z->cyc += 5;
       z->mem_ptr = z->pc + 1;
@@ -1595,7 +1617,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   } break; // cpir
   case 0xB9: {
     cpd(z);
-    if (get_bc(z) != 0 && !z->zf) {
+    if (get_bc(z) != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
       z->cyc += 5;
     } else {
@@ -1743,14 +1765,15 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     uint8_t val = rb(z, get_hl(z));
     z->a = (a & 0xF0) | (val & 0xF);
     wb(z, get_hl(z), (val >> 4) | (a << 4));
-
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
-    z->zf = z->a == 0;
-    z->sf = z->a >> 7;
-    z->pf = parity(z->a);
+    z->f = 0 |
+      flag_val(cf, flag_get(z, cf)) | /* cf unmodified */
+      flag_val(nf, 0) |
+      flag_val(hf, 0) |
+      flag_val(xf, GET_BIT(3, z->a)) |
+      flag_val(yf, GET_BIT(5, z->a)) |
+      flag_val(zf, z->a == 0) |
+      flag_val(sf, z->a >> 7) |
+      flag_val(pf, parity(z->a));
     z->mem_ptr = get_hl(z) + 1;
   } break; // rrd
 
@@ -1760,13 +1783,15 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     z->a = (a & 0xF0) | (val >> 4);
     wb(z, get_hl(z), (val << 4) | (a & 0xF));
 
-    z->nf = 0;
-    z->hf = 0;
-    z->xf = GET_BIT(3, z->a);
-    z->yf = GET_BIT(5, z->a);
-    z->zf = z->a == 0;
-    z->sf = z->a >> 7;
-    z->pf = parity(z->a);
+    z->f = 0 |
+      flag_val(cf, flag_get(z, cf)) | /* cf unmodified */
+      flag_val(nf, 0) |
+      flag_val(hf, 0) |
+      flag_val(xf, GET_BIT(3, z->a)) |
+      flag_val(yf, GET_BIT(5, z->a)) |
+      flag_val(zf, z->a == 0) |
+      flag_val(sf, z->a >> 7) |
+      flag_val(pf, parity(z->a));
     z->mem_ptr = get_hl(z) + 1;
   } break; // rld
 
