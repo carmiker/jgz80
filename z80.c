@@ -107,41 +107,6 @@ static inline uint16_t nextw(z80* const z) {
   return rw(z, z->pc - 2);
 }
 
-static inline uint16_t get_bc(z80* const z) {
-  return (z->b << 8) | z->c;
-}
-
-static inline uint16_t get_de(z80* const z) {
-  return (z->d << 8) | z->e;
-}
-
-static inline uint16_t get_hl(z80* const z) {
-  return (z->h << 8) | z->l;
-}
-
-static inline void set_bc(z80* const z, uint16_t val) {
-  z->b = val >> 8;
-  z->c = val & 0xFF;
-}
-
-static inline void set_de(z80* const z, uint16_t val) {
-  z->d = val >> 8;
-  z->e = val & 0xFF;
-}
-
-static inline void set_hl(z80* const z, uint16_t val) {
-  z->h = val >> 8;
-  z->l = val & 0xFF;
-}
-
-static inline uint8_t get_f(z80* const z) {
-  return z->f;
-}
-
-static inline void set_f(z80* const z, uint8_t val) {
-  z->f = val;
-}
-
 // increments R, keeping the highest byte intact
 static inline void inc_r(z80* const z) {
   z->r = (z->r & 0x80) | ((z->r + 1) & 0x7f);
@@ -283,8 +248,8 @@ static inline void addhl(z80* const z, uint16_t val) {
   bool sfc = flag_get(z, sf);
   bool zfc = flag_get(z, zf);
   bool pfc = flag_get(z, pf);
-  uint16_t result = addw(z, get_hl(z), val, 0);
-  set_hl(z, result);
+  uint16_t result = addw(z, z->hl, val, 0);
+  z->hl = result;
   flag_set(z, sf, sfc);
   flag_set(z, zf, zfc);
   flag_set(z, pf, pfc);
@@ -304,18 +269,18 @@ static inline void addiz(z80* const z, uint16_t* reg, uint16_t val) {
 
 // adds a word (+ carry) to HL
 static inline void adchl(z80* const z, uint16_t val) {
-  uint16_t result = addw(z, get_hl(z), val, flag_get(z, cf));
+  uint16_t result = addw(z, z->hl, val, flag_get(z, cf));
   flag_set(z, sf, result >> 15);
   flag_set(z, zf, result == 0);
-  set_hl(z, result);
+  z->hl = result;
 }
 
 // substracts a word (+ carry) to HL
 static inline void sbchl(z80* const z, uint16_t val) {
-  const uint16_t result = subw(z, get_hl(z), val, flag_get(z, cf));
+  const uint16_t result = subw(z, z->hl, val, flag_get(z, cf));
   flag_set(z, sf, result >> 15);
   flag_set(z, zf, result == 0);
-  set_hl(z, result);
+  z->hl = result;
 }
 
 // increments a byte value
@@ -543,15 +508,15 @@ static inline uint8_t cb_bit(z80* const z, uint8_t val, uint8_t n) {
 }
 
 static inline void ldi(z80* const z) {
-  const uint16_t de = get_de(z);
-  const uint16_t hl = get_hl(z);
+  const uint16_t de = z->de;
+  const uint16_t hl = z->hl;
   const uint8_t val = rb(z, hl);
 
   wb(z, de, val);
 
-  set_hl(z, get_hl(z) + 1);
-  set_de(z, get_de(z) + 1);
-  set_bc(z, get_bc(z) - 1);
+  ++z->hl;
+  ++z->de;
+  --z->bc;
 
   // see https://wikiti.brandonw.net/index.php?title=Z80_Instruction_Set
   // for the calculation of xf/yf on LDI
@@ -561,25 +526,25 @@ static inline void ldi(z80* const z) {
 
   flag_set(z, nf, 0);
   flag_set(z, hf, 0);
-  flag_set(z, pf, get_bc(z) > 0);
+  flag_set(z, pf, z->bc > 0);
 }
 
 static inline void ldd(z80* const z) {
   ldi(z);
   // same as ldi but HL and DE are decremented instead of incremented
-  set_hl(z, get_hl(z) - 2);
-  set_de(z, get_de(z) - 2);
+  z->hl -= 2;
+  z->de -= 2;
 }
 
 static inline void cpi(z80* const z) {
   bool cfc = flag_get(z, cf);
-  const uint8_t result = subb(z, z->a, rb(z, get_hl(z)), 0);
-  set_hl(z, get_hl(z) + 1);
-  set_bc(z, get_bc(z) - 1);
+  const uint8_t result = subb(z, z->a, rb(z, z->hl), 0);
+  ++z->hl;
+  --z->bc;
   bool hfc = flag_get(z, hf);
   flag_set(z, xf, GET_BIT(3, result - hfc));
   flag_set(z, yf, GET_BIT(1, result - hfc));
-  flag_set(z, pf, get_bc(z) != 0);
+  flag_set(z, pf, z->bc != 0);
   flag_set(z, cf, cfc);
   z->mem_ptr += 1;
 }
@@ -587,7 +552,7 @@ static inline void cpi(z80* const z) {
 static inline void cpd(z80* const z) {
   cpi(z);
   // same as cpi but HL is decremented instead of incremented
-  set_hl(z, get_hl(z) - 2);
+  z->hl -= 2;
   z->mem_ptr -= 2;
 }
 
@@ -602,33 +567,33 @@ static void in_r_c(z80* const z, uint8_t* r) {
 
 static void ini(z80* const z) {
   uint8_t val = z->port_in(z, z->c);
-  wb(z, get_hl(z), val);
-  set_hl(z, get_hl(z) + 1);
+  wb(z, z->hl, val);
+  ++z->hl;
   z->b -= 1;
   flag_set(z, zf, z->b == 0);
   flag_set(z, nf, 1);
-  z->mem_ptr = get_bc(z) + 1;
+  z->mem_ptr = z->bc + 1;
 }
 
 static void ind(z80* const z) {
   ini(z);
-  set_hl(z, get_hl(z) - 2);
-  z->mem_ptr = get_bc(z) - 2;
+  z->hl -= 2;
+  z->mem_ptr = z->bc - 2;
 }
 
 static void outi(z80* const z) {
-  z->port_out(z, z->c, rb(z, get_hl(z)));
-  set_hl(z, get_hl(z) + 1);
+  z->port_out(z, z->c, rb(z, z->hl));
+  ++z->hl;
   z->b -= 1;
   flag_set(z, zf, z->b == 0);
   flag_set(z, nf, 1);
-  z->mem_ptr = get_bc(z) + 1;
+  z->mem_ptr = z->bc + 1;
 }
 
 static void outd(z80* const z) {
   outi(z);
-  set_hl(z, get_hl(z) - 2);
-  z->mem_ptr = get_bc(z) - 2;
+  z->hl -= 2;
+  z->mem_ptr = z->bc - 2;
 }
 
 static void daa(z80* const z) {
@@ -749,23 +714,15 @@ void z80_init(z80* const z) {
 
   // af and sp are set to 0xFFFF after reset,
   // and the other values are undefined (z80-documented)
-  z->a = 0xFF;
-  z->f = 0xFF;
-  z->b = 0;
-  z->c = 0;
-  z->d = 0;
-  z->e = 0;
-  z->h = 0;
-  z->l = 0;
+  z->af = 0xFFFF;
+  z->bc = 0;
+  z->de = 0;
+  z->hl = 0;
 
-  z->a_ = 0;
-  z->b_ = 0;
-  z->c_ = 0;
-  z->d_ = 0;
-  z->e_ = 0;
-  z->h_ = 0;
-  z->l_ = 0;
-  z->f_ = 0;
+  z->a_f_ = 0;
+  z->b_c_ = 0;
+  z->d_e_ = 0;
+  z->h_l_ = 0;
 
   z->i = 0;
   z->r = 0;
@@ -797,7 +754,7 @@ void z80_debug_output(z80* const z) {
   if (z) { }
   /*printf("PC: %04X, AF: %04X, BC: %04X, DE: %04X, HL: %04X, SP: %04X, "
          "IX: %04X, IY: %04X, I: %02X, R: %02X",
-      z->pc, (z->a << 8) | get_f(z), get_bc(z), get_de(z), get_hl(z), z->sp,
+      z->pc, (z->a << 8) | z->f, z->bc, z->de, z->hl, z->sp,
       z->ix, z->iy, z->i, z->r);
 
   printf("\t(%02X %02X %02X %02X), cyc: %lu\n", rb(z, z->pc), rb(z, z->pc + 1),
@@ -881,21 +838,21 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x6C: z->l = z->h; break; // ld l,h
   case 0x6D: z->l = z->l; break; // ld l,l
 
-  case 0x7E: z->a = rb(z, get_hl(z)); break; // ld a,(hl)
-  case 0x46: z->b = rb(z, get_hl(z)); break; // ld b,(hl)
-  case 0x4E: z->c = rb(z, get_hl(z)); break; // ld c,(hl)
-  case 0x56: z->d = rb(z, get_hl(z)); break; // ld d,(hl)
-  case 0x5E: z->e = rb(z, get_hl(z)); break; // ld e,(hl)
-  case 0x66: z->h = rb(z, get_hl(z)); break; // ld h,(hl)
-  case 0x6E: z->l = rb(z, get_hl(z)); break; // ld l,(hl)
+  case 0x7E: z->a = rb(z, z->hl); break; // ld a,(hl)
+  case 0x46: z->b = rb(z, z->hl); break; // ld b,(hl)
+  case 0x4E: z->c = rb(z, z->hl); break; // ld c,(hl)
+  case 0x56: z->d = rb(z, z->hl); break; // ld d,(hl)
+  case 0x5E: z->e = rb(z, z->hl); break; // ld e,(hl)
+  case 0x66: z->h = rb(z, z->hl); break; // ld h,(hl)
+  case 0x6E: z->l = rb(z, z->hl); break; // ld l,(hl)
 
-  case 0x77: wb(z, get_hl(z), z->a); break; // ld (hl),a
-  case 0x70: wb(z, get_hl(z), z->b); break; // ld (hl),b
-  case 0x71: wb(z, get_hl(z), z->c); break; // ld (hl),c
-  case 0x72: wb(z, get_hl(z), z->d); break; // ld (hl),d
-  case 0x73: wb(z, get_hl(z), z->e); break; // ld (hl),e
-  case 0x74: wb(z, get_hl(z), z->h); break; // ld (hl),h
-  case 0x75: wb(z, get_hl(z), z->l); break; // ld (hl),l
+  case 0x77: wb(z, z->hl, z->a); break; // ld (hl),a
+  case 0x70: wb(z, z->hl, z->b); break; // ld (hl),b
+  case 0x71: wb(z, z->hl, z->c); break; // ld (hl),c
+  case 0x72: wb(z, z->hl, z->d); break; // ld (hl),d
+  case 0x73: wb(z, z->hl, z->e); break; // ld (hl),e
+  case 0x74: wb(z, z->hl, z->h); break; // ld (hl),h
+  case 0x75: wb(z, z->hl, z->l); break; // ld (hl),l
 
   case 0x3E: z->a = nextb(z); break; // ld a,*
   case 0x06: z->b = nextb(z); break; // ld b,*
@@ -904,15 +861,15 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x1E: z->e = nextb(z); break; // ld e,*
   case 0x26: z->h = nextb(z); break; // ld h,*
   case 0x2E: z->l = nextb(z); break; // ld l,*
-  case 0x36: wb(z, get_hl(z), nextb(z)); break; // ld (hl),*
+  case 0x36: wb(z, z->hl, nextb(z)); break; // ld (hl),*
 
   case 0x0A:
-    z->a = rb(z, get_bc(z));
-    z->mem_ptr = get_bc(z) + 1;
+    z->a = rb(z, z->bc);
+    z->mem_ptr = z->bc + 1;
     break; // ld a,(bc)
   case 0x1A:
-    z->a = rb(z, get_de(z));
-    z->mem_ptr = get_de(z) + 1;
+    z->a = rb(z, z->de);
+    z->mem_ptr = z->de + 1;
     break; // ld a,(de)
   case 0x3A: {
     const uint16_t addr = nextw(z);
@@ -921,13 +878,13 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   } break; // ld a,(**)
 
   case 0x02:
-    wb(z, get_bc(z), z->a);
-    z->mem_ptr = (z->a << 8) | ((get_bc(z) + 1) & 0xFF);
+    wb(z, z->bc, z->a);
+    z->mem_ptr = (z->a << 8) | ((z->bc + 1) & 0xFF);
     break; // ld (bc),a
 
   case 0x12:
-    wb(z, get_de(z), z->a);
-    z->mem_ptr = (z->a << 8) | ((get_de(z) + 1) & 0xFF);
+    wb(z, z->de, z->a);
+    z->mem_ptr = (z->a << 8) | ((z->de + 1) & 0xFF);
     break; // ld (de),a
 
   case 0x32: {
@@ -936,35 +893,35 @@ void exec_opcode(z80* const z, uint8_t opcode) {
     z->mem_ptr = (z->a << 8) | ((addr + 1) & 0xFF);
   } break; // ld (**),a
 
-  case 0x01: set_bc(z, nextw(z)); break; // ld bc,**
-  case 0x11: set_de(z, nextw(z)); break; // ld de,**
-  case 0x21: set_hl(z, nextw(z)); break; // ld hl,**
+  case 0x01: z->bc = nextw(z); break; // ld bc,**
+  case 0x11: z->de = nextw(z); break; // ld de,**
+  case 0x21: z->hl = nextw(z); break; // ld hl,**
   case 0x31: z->sp = nextw(z); break; // ld sp,**
 
   case 0x2A: {
     const uint16_t addr = nextw(z);
-    set_hl(z, rw(z, addr));
+    z->hl = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld hl,(**)
 
   case 0x22: {
     const uint16_t addr = nextw(z);
-    ww(z, addr, get_hl(z));
+    ww(z, addr, z->hl);
     z->mem_ptr = addr + 1;
   } break; // ld (**),hl
 
-  case 0xF9: z->sp = get_hl(z); break; // ld sp,hl
+  case 0xF9: z->sp = z->hl; break; // ld sp,hl
 
   case 0xEB: {
-    const uint16_t de = get_de(z);
-    set_de(z, get_hl(z));
-    set_hl(z, de);
+    const uint16_t de = z->de;
+    z->de = z->hl;
+    z->hl = de;
   } break; // ex de,hl
 
   case 0xE3: {
     const uint16_t val = rw(z, z->sp);
-    ww(z, z->sp, get_hl(z));
-    set_hl(z, val);
+    ww(z, z->sp, z->hl);
+    z->hl = val;
     z->mem_ptr = val;
   } break; // ex (sp),hl
 
@@ -975,7 +932,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x83: z->a = addb(z, z->a, z->e, 0); break; // add a,e
   case 0x84: z->a = addb(z, z->a, z->h, 0); break; // add a,h
   case 0x85: z->a = addb(z, z->a, z->l, 0); break; // add a,l
-  case 0x86: z->a = addb(z, z->a, rb(z, get_hl(z)), 0); break; // add a,(hl)
+  case 0x86: z->a = addb(z, z->a, rb(z, z->hl), 0); break; // add a,(hl)
   case 0xC6: z->a = addb(z, z->a, nextb(z), 0); break; // add a,*
 
   case 0x8F: z->a = addb(z, z->a, z->a, flag_get(z, cf)); break; // adc a,a
@@ -985,7 +942,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x8B: z->a = addb(z, z->a, z->e, flag_get(z, cf)); break; // adc a,e
   case 0x8C: z->a = addb(z, z->a, z->h, flag_get(z, cf)); break; // adc a,h
   case 0x8D: z->a = addb(z, z->a, z->l, flag_get(z, cf)); break; // adc a,l
-  case 0x8E: z->a = addb(z, z->a, rb(z, get_hl(z)), flag_get(z, cf)); break; // adc a,(hl)
+  case 0x8E: z->a = addb(z, z->a, rb(z, z->hl), flag_get(z, cf)); break; // adc a,(hl)
   case 0xCE: z->a = addb(z, z->a, nextb(z), flag_get(z, cf)); break; // adc a,*
 
   case 0x97: z->a = subb(z, z->a, z->a, 0); break; // sub a,a
@@ -995,7 +952,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x93: z->a = subb(z, z->a, z->e, 0); break; // sub a,e
   case 0x94: z->a = subb(z, z->a, z->h, 0); break; // sub a,h
   case 0x95: z->a = subb(z, z->a, z->l, 0); break; // sub a,l
-  case 0x96: z->a = subb(z, z->a, rb(z, get_hl(z)), 0); break; // sub a,(hl)
+  case 0x96: z->a = subb(z, z->a, rb(z, z->hl), 0); break; // sub a,(hl)
   case 0xD6: z->a = subb(z, z->a, nextb(z), 0); break; // sub a,*
 
   case 0x9F: z->a = subb(z, z->a, z->a, flag_get(z, cf)); break; // sbc a,a
@@ -1005,12 +962,12 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x9B: z->a = subb(z, z->a, z->e, flag_get(z, cf)); break; // sbc a,e
   case 0x9C: z->a = subb(z, z->a, z->h, flag_get(z, cf)); break; // sbc a,h
   case 0x9D: z->a = subb(z, z->a, z->l, flag_get(z, cf)); break; // sbc a,l
-  case 0x9E: z->a = subb(z, z->a, rb(z, get_hl(z)), flag_get(z, cf)); break; // sbc a,(hl)
+  case 0x9E: z->a = subb(z, z->a, rb(z, z->hl), flag_get(z, cf)); break; // sbc a,(hl)
   case 0xDE: z->a = subb(z, z->a, nextb(z), flag_get(z, cf)); break; // sbc a,*
 
-  case 0x09: addhl(z, get_bc(z)); break; // add hl,bc
-  case 0x19: addhl(z, get_de(z)); break; // add hl,de
-  case 0x29: addhl(z, get_hl(z)); break; // add hl,hl
+  case 0x09: addhl(z, z->bc); break; // add hl,bc
+  case 0x19: addhl(z, z->de); break; // add hl,de
+  case 0x29: addhl(z, z->hl); break; // add hl,hl
   case 0x39: addhl(z, z->sp); break; // add hl,sp
 
   case 0xF3:
@@ -1029,8 +986,8 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x24: z->h = inc(z, z->h); break; // inc h
   case 0x2C: z->l = inc(z, z->l); break; // inc l
   case 0x34: {
-    uint8_t result = inc(z, rb(z, get_hl(z)));
-    wb(z, get_hl(z), result);
+    uint8_t result = inc(z, rb(z, z->hl));
+    wb(z, z->hl, result);
   } break; // inc (hl)
 
   case 0x3D: z->a = dec(z, z->a); break; // dec a
@@ -1041,19 +998,19 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x25: z->h = dec(z, z->h); break; // dec h
   case 0x2D: z->l = dec(z, z->l); break; // dec l
   case 0x35: {
-    uint8_t result = dec(z, rb(z, get_hl(z)));
-    wb(z, get_hl(z), result);
+    uint8_t result = dec(z, rb(z, z->hl));
+    wb(z, z->hl, result);
   } break; // dec (hl)
 
-  case 0x03: set_bc(z, get_bc(z) + 1); break; // inc bc
-  case 0x13: set_de(z, get_de(z) + 1); break; // inc de
-  case 0x23: set_hl(z, get_hl(z) + 1); break; // inc hl
-  case 0x33: z->sp = z->sp + 1; break; // inc sp
+  case 0x03: ++z->bc; break; // inc bc
+  case 0x13: ++z->de; break; // inc de
+  case 0x23: ++z->hl; break; // inc hl
+  case 0x33: ++z->sp; break; // inc sp
 
-  case 0x0B: set_bc(z, get_bc(z) - 1); break; // dec bc
-  case 0x1B: set_de(z, get_de(z) - 1); break; // dec de
-  case 0x2B: set_hl(z, get_hl(z) - 1); break; // dec hl
-  case 0x3B: z->sp = z->sp - 1; break; // dec sp
+  case 0x0B: --z->bc; break; // dec bc
+  case 0x1B: --z->de; break; // dec de
+  case 0x2B: --z->hl; break; // dec hl
+  case 0x3B: --z->sp; break; // dec sp
 
   case 0x27: daa(z); break; // daa
 
@@ -1126,7 +1083,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xA3: land(z, z->e); break; // and e
   case 0xA4: land(z, z->h); break; // and h
   case 0xA5: land(z, z->l); break; // and l
-  case 0xA6: land(z, rb(z, get_hl(z))); break; // and (hl)
+  case 0xA6: land(z, rb(z, z->hl)); break; // and (hl)
   case 0xE6: land(z, nextb(z)); break; // and *
 
   case 0xAF: lxor(z, z->a); break; // xor a
@@ -1136,7 +1093,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xAB: lxor(z, z->e); break; // xor e
   case 0xAC: lxor(z, z->h); break; // xor h
   case 0xAD: lxor(z, z->l); break; // xor l
-  case 0xAE: lxor(z, rb(z, get_hl(z))); break; // xor (hl)
+  case 0xAE: lxor(z, rb(z, z->hl)); break; // xor (hl)
   case 0xEE: lxor(z, nextb(z)); break; // xor *
 
   case 0xB7: lor(z, z->a); break; // or a
@@ -1146,7 +1103,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xB3: lor(z, z->e); break; // or e
   case 0xB4: lor(z, z->h); break; // or h
   case 0xB5: lor(z, z->l); break; // or l
-  case 0xB6: lor(z, rb(z, get_hl(z))); break; // or (hl)
+  case 0xB6: lor(z, rb(z, z->hl)); break; // or (hl)
   case 0xF6: lor(z, nextb(z)); break; // or *
 
   case 0xBF: cp(z, z->a); break; // cp a
@@ -1156,7 +1113,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xBB: cp(z, z->e); break; // cp e
   case 0xBC: cp(z, z->h); break; // cp h
   case 0xBD: cp(z, z->l); break; // cp l
-  case 0xBE: cp(z, rb(z, get_hl(z))); break; // cp (hl)
+  case 0xBE: cp(z, rb(z, z->hl)); break; // cp (hl)
   case 0xFE: cp(z, nextb(z)); break; // cp *
 
   case 0xC3: jump(z, nextw(z)); break; // jm **
@@ -1176,7 +1133,7 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0x30: cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
   case 0x38: cond_jr(z, flag_get(z, cf) == 1); break; // jr c, *
 
-  case 0xE9: z->pc = get_hl(z); break; // jp (hl)
+  case 0xE9: z->pc = z->hl; break; // jp (hl)
   case 0xCD: call(z, nextw(z)); break; // call
 
   case 0xC4: cond_call(z, flag_get(z, zf) == 0); break; // cnz
@@ -1207,19 +1164,15 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xF7: call(z, 0x30); break; // rst 6
   case 0xFF: call(z, 0x38); break; // rst 7
 
-  case 0xC5: pushw(z, get_bc(z)); break; // push bc
-  case 0xD5: pushw(z, get_de(z)); break; // push de
-  case 0xE5: pushw(z, get_hl(z)); break; // push hl
-  case 0xF5: pushw(z, (z->a << 8) | get_f(z)); break; // push af
+  case 0xC5: pushw(z, z->bc); break; // push bc
+  case 0xD5: pushw(z, z->de); break; // push de
+  case 0xE5: pushw(z, z->hl); break; // push hl
+  case 0xF5: pushw(z, z->af); break; // push af
 
-  case 0xC1: set_bc(z, popw(z)); break; // pop bc
-  case 0xD1: set_de(z, popw(z)); break; // pop de
-  case 0xE1: set_hl(z, popw(z)); break; // pop hl
-  case 0xF1: {
-    uint16_t val = popw(z);
-    z->a = val >> 8;
-    set_f(z, val & 0xFF);
-  } break; // pop af
+  case 0xC1: z->bc = popw(z); break; // pop bc
+  case 0xD1: z->de = popw(z); break; // pop de
+  case 0xE1: z->hl = popw(z); break; // pop hl
+  case 0xF1: z->af = popw(z); break; // pop af
 
   case 0xDB: {
     const uint8_t port = nextb(z);
@@ -1235,31 +1188,20 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   } break; // out (n), a
 
   case 0x08: {
-    uint8_t a = z->a;
-    uint8_t f = get_f(z);
-
-    z->a = z->a_;
-    set_f(z, z->f_);
-
-    z->a_ = a;
-    z->f_ = f;
+    uint16_t af = z->af;
+    z->af = z->a_f_;
+    z->a_f_ = af;
   } break; // ex af,af'
   case 0xD9: {
-    uint8_t b = z->b, c = z->c, d = z->d, e = z->e, h = z->h, l = z->l;
+    uint16_t bc = z->bc, de = z->de, hl = z->hl;
 
-    z->b = z->b_;
-    z->c = z->c_;
-    z->d = z->d_;
-    z->e = z->e_;
-    z->h = z->h_;
-    z->l = z->l_;
+    z->bc = z->b_c_;
+    z->de = z->d_e_;
+    z->hl = z->h_l_;
 
-    z->b_ = b;
-    z->c_ = c;
-    z->d_ = d;
-    z->e_ = e;
-    z->h_ = h;
-    z->l_ = l;
+    z->b_c_ = bc;
+    z->d_e_ = de;
+    z->h_l_ = hl;
   } break; // exx
 
   case 0xCB: exec_opcode_cb(z, nextb(z)); break;
@@ -1286,8 +1228,8 @@ void exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
 
   case 0xE9: jump(z, *iz); break; // jp iz
 
-  case 0x09: addiz(z, iz, get_bc(z)); break; // add iz,bc
-  case 0x19: addiz(z, iz, get_de(z)); break; // add iz,de
+  case 0x09: addiz(z, iz, z->bc); break; // add iz,bc
+  case 0x19: addiz(z, iz, z->de); break; // add iz,de
   case 0x29: addiz(z, iz, *iz); break; // add iz,iz
   case 0x39: addiz(z, iz, z->sp); break; // add iz,sp
 
@@ -1443,7 +1385,7 @@ void exec_opcode_cb(z80* const z, uint8_t opcode) {
   case 4: reg = &z->h; break;
   case 5: reg = &z->l; break;
   case 6:
-    hl = rb(z, get_hl(z));
+    hl = rb(z, z->hl);
     reg = &hl;
     break;
   case 7: reg = &z->a; break;
@@ -1477,7 +1419,7 @@ void exec_opcode_cb(z80* const z, uint8_t opcode) {
   }
 
   if ((x_ != 1) && (z_ == 6)) { // BIT (HL) not included
-    wb(z, get_hl(z), hl);
+    wb(z, z->hl, hl);
     z->cyc += 7;
   }
 }
@@ -1529,7 +1471,7 @@ void exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
     case 3: z->e = result; break;
     case 4: z->h = result; break;
     case 5: z->l = result; break;
-    case 6: wb(z, get_hl(z), result); break;
+    case 6: wb(z, z->hl, result); break;
     case 7: z->a = result; break;
     }
   }
@@ -1585,7 +1527,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0xB0: {
     ldi(z);
 
-    if (get_bc(z) != 0) {
+    if (z->bc != 0) {
       z->pc -= 2;
       z->cyc += 5;
       z->mem_ptr = z->pc + 1;
@@ -1596,7 +1538,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0xB8: {
     ldd(z);
 
-    if (get_bc(z) != 0) {
+    if (z->bc != 0) {
       z->pc -= 2;
       z->cyc += 5;
       z->mem_ptr = z->pc + 1;
@@ -1607,7 +1549,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0xA9: cpd(z); break; // cpd
   case 0xB1: {
     cpi(z);
-    if (get_bc(z) != 0 && !flag_get(z, zf)) {
+    if (z->bc != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
       z->cyc += 5;
       z->mem_ptr = z->pc + 1;
@@ -1617,7 +1559,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   } break; // cpir
   case 0xB9: {
     cpd(z);
-    if (get_bc(z) != 0 && !flag_get(z, zf)) {
+    if (z->bc != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
       z->cyc += 5;
     } else {
@@ -1637,7 +1579,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   } break; // in (c)
   case 0x78:
     in_r_c(z, &z->a);
-    z->mem_ptr = get_bc(z) + 1;
+    z->mem_ptr = z->bc + 1;
     break; // in a, (c)
 
   case 0xA2: ini(z); break; // ini
@@ -1666,7 +1608,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0x71: z->port_out(z, z->c, 0); break; // out (c), 0
   case 0x79:
     z->port_out(z, z->c, z->a);
-    z->mem_ptr = get_bc(z) + 1;
+    z->mem_ptr = z->bc + 1;
     break; // out (c), a
 
   case 0xA3: outi(z); break; // outi
@@ -1686,31 +1628,31 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
   } break; // otdr
 
-  case 0x42: sbchl(z, get_bc(z)); break; // sbc hl,bc
-  case 0x52: sbchl(z, get_de(z)); break; // sbc hl,de
-  case 0x62: sbchl(z, get_hl(z)); break; // sbc hl,hl
+  case 0x42: sbchl(z, z->bc); break; // sbc hl,bc
+  case 0x52: sbchl(z, z->de); break; // sbc hl,de
+  case 0x62: sbchl(z, z->hl); break; // sbc hl,hl
   case 0x72: sbchl(z, z->sp); break; // sbc hl,sp
 
-  case 0x4A: adchl(z, get_bc(z)); break; // adc hl,bc
-  case 0x5A: adchl(z, get_de(z)); break; // adc hl,de
-  case 0x6A: adchl(z, get_hl(z)); break; // adc hl,hl
+  case 0x4A: adchl(z, z->bc); break; // adc hl,bc
+  case 0x5A: adchl(z, z->de); break; // adc hl,de
+  case 0x6A: adchl(z, z->hl); break; // adc hl,hl
   case 0x7A: adchl(z, z->sp); break; // adc hl,sp
 
   case 0x43: {
     const uint16_t addr = nextw(z);
-    ww(z, addr, get_bc(z));
+    ww(z, addr, z->bc);
     z->mem_ptr = addr + 1;
   } break; // ld (**), bc
 
   case 0x53: {
     const uint16_t addr = nextw(z);
-    ww(z, addr, get_de(z));
+    ww(z, addr, z->de);
     z->mem_ptr = addr + 1;
   } break; // ld (**), de
 
   case 0x63: {
     const uint16_t addr = nextw(z);
-    ww(z, addr, get_hl(z));
+    ww(z, addr, z->hl);
     z->mem_ptr = addr + 1;
   } break; // ld (**), hl
 
@@ -1722,19 +1664,19 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
 
   case 0x4B: {
     const uint16_t addr = nextw(z);
-    set_bc(z, rw(z, addr));
+    z->bc = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld bc, (**)
 
   case 0x5B: {
     const uint16_t addr = nextw(z);
-    set_de(z, rw(z, addr));
+    z->de = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld de, (**)
 
   case 0x6B: {
     const uint16_t addr = nextw(z);
-    set_hl(z, rw(z, addr));
+    z->hl = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld hl, (**)
 
@@ -1762,9 +1704,9 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
 
   case 0x67: {
     uint8_t a = z->a;
-    uint8_t val = rb(z, get_hl(z));
+    uint8_t val = rb(z, z->hl);
     z->a = (a & 0xF0) | (val & 0xF);
-    wb(z, get_hl(z), (val >> 4) | (a << 4));
+    wb(z, z->hl, (val >> 4) | (a << 4));
     z->f = 0 |
       flag_val(cf, flag_get(z, cf)) | /* cf unmodified */
       flag_val(nf, 0) |
@@ -1774,14 +1716,14 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
       flag_val(zf, z->a == 0) |
       flag_val(sf, z->a >> 7) |
       flag_val(pf, parity(z->a));
-    z->mem_ptr = get_hl(z) + 1;
+    z->mem_ptr = z->hl + 1;
   } break; // rrd
 
   case 0x6F: {
     uint8_t a = z->a;
-    uint8_t val = rb(z, get_hl(z));
+    uint8_t val = rb(z, z->hl);
     z->a = (a & 0xF0) | (val >> 4);
-    wb(z, get_hl(z), (val << 4) | (a & 0xF));
+    wb(z, z->hl, (val << 4) | (a & 0xF));
 
     z->f = 0 |
       flag_val(cf, flag_get(z, cf)) | /* cf unmodified */
@@ -1792,7 +1734,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
       flag_val(zf, z->a == 0) |
       flag_val(sf, z->a >> 7) |
       flag_val(pf, parity(z->a));
-    z->mem_ptr = get_hl(z) + 1;
+    z->mem_ptr = z->hl + 1;
   } break; // rld
 
   default: break;

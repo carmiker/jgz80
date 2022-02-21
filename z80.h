@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#if !defined(__BYTE_ORDER__)
+# error need __BYTE_ORDER__ macro
+#endif
+
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define Z80REG(A, B) union {struct { uint8_t B, A; }; uint16_t A ## B;}
+#else
+#define Z80REG(A, B) union {struct { uint8_t A, B; }; uint16_t A ## B;}
+#endif
+
 typedef struct z80 z80;
 struct z80 {
   uint8_t (*read_byte)(void*, uint16_t);
@@ -17,10 +27,15 @@ struct z80 {
 
   uint16_t pc, sp, ix, iy; // special purpose registers
   uint16_t mem_ptr; // "wz" register
-  uint8_t a, b, c, d, e, h, l, f; // main registers, f = flags
-  uint8_t a_, b_, c_, d_, e_, h_, l_, f_; // alternate registers
+  Z80REG(a, f);
+  Z80REG(b, c);
+  Z80REG(d, e);
+  Z80REG(h, l);
+  Z80REG(a_, f_);
+  Z80REG(b_, c_);
+  Z80REG(d_, e_);
+  Z80REG(h_, l_);
   uint8_t i, r; // interrupt vector, memory refresh
-
   uint8_t iff_delay;
   uint8_t interrupt_mode;
   uint8_t int_data;
