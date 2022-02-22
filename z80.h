@@ -44,6 +44,7 @@ struct z80 {
 
 void z80_init(z80* const z);
 unsigned z80_step(z80* const z); /* return cycles used */
+unsigned z80_step_n(z80* const z, unsigned cycles);
 void z80_debug_output(z80* const z);
 void z80_gen_nmi(z80* const z);
 void z80_gen_int(z80* const z, uint8_t data);

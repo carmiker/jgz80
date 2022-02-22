@@ -741,8 +741,7 @@ void z80_init(z80* const z) {
   z->int_data = 0;
 }
 
-// executes the next instruction in memory + handles interrupts
-unsigned z80_step(z80* const z) {
+static unsigned z80_step_s(z80* const z) {
   unsigned cyc = 0;
   if (z->halted) {
     cyc += exec_opcode(z, 0x00);
@@ -752,6 +751,21 @@ unsigned z80_step(z80* const z) {
   }
 
   cyc += process_interrupts(z);
+  return cyc;
+}
+
+// executes the next instruction in memory + handles interrupts
+unsigned z80_step(z80* const z) {
+  return z80_step_s(z);
+}
+
+// executes the next instructions in memory + handles interrupts,
+// until the cycle count is >= the requested amount.
+unsigned z80_step_n(z80* const z, unsigned cycles) {
+  unsigned cyc = 0;
+  while (cyc < cycles) {
+    cyc += z80_step_s(z);
+  }
   return cyc;
 }
 
