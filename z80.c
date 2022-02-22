@@ -797,7 +797,7 @@ void z80_clr_int(z80* const z) {
 }
 
 // executes a non-prefixed opcode
-unsigned exec_opcode(z80* const z, uint8_t opcode) {
+static unsigned exec_opcode(z80* const z, uint8_t opcode) {
   unsigned cyc = cyc_00[opcode];
   inc_r(z);
 
@@ -1235,7 +1235,7 @@ unsigned exec_opcode(z80* const z, uint8_t opcode) {
 }
 
 // executes a DD/FD opcode (IZ = IX or IY)
-unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
+static unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
   unsigned cyc = cyc_ddfd[opcode];
   inc_r(z);
 
@@ -1388,7 +1388,7 @@ unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
 }
 
 // executes a CB opcode
-unsigned exec_opcode_cb(z80* const z, uint8_t opcode) {
+static unsigned exec_opcode_cb(z80* const z, uint8_t opcode) {
   unsigned cyc = 8;
   inc_r(z);
 
@@ -1448,7 +1448,7 @@ unsigned exec_opcode_cb(z80* const z, uint8_t opcode) {
 }
 
 // executes a displaced CB opcode (DDCB or FDCB)
-unsigned exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
+static unsigned exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
   unsigned cyc = 0;
   uint8_t val = rb(z, addr);
   uint8_t result = 0;
@@ -1511,7 +1511,7 @@ unsigned exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
 }
 
 // executes a ED opcode
-unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
+static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
   unsigned cyc = cyc_ed[opcode];
   inc_r(z);
   switch (opcode) {
