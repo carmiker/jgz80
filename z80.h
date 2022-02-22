@@ -23,8 +23,6 @@ struct z80 {
   void (*port_out)(z80*, uint8_t, uint8_t);
   void* userdata;
 
-  uint64_t cyc; // cycle count (t-states)
-
   uint16_t pc, sp, ix, iy; // special purpose registers
   uint16_t mem_ptr; // "wz" register
   Z80REG(a, f);
@@ -45,7 +43,7 @@ struct z80 {
 };
 
 void z80_init(z80* const z);
-void z80_step(z80* const z);
+unsigned z80_step(z80* const z); /* return cycles used */
 void z80_debug_output(z80* const z);
 void z80_gen_nmi(z80* const z);
 void z80_gen_int(z80* const z, uint8_t data);

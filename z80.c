@@ -130,12 +130,12 @@ static inline bool parity(uint8_t val) {
   return (nb_one_bits & 1) == 0;
 }
 
-static void exec_opcode(z80* const z, uint8_t opcode);
-static void exec_opcode_cb(z80* const z, uint8_t opcode);
-static void exec_opcode_dcb(
+static unsigned exec_opcode(z80* const z, uint8_t opcode);
+static unsigned exec_opcode_cb(z80* const z, uint8_t opcode);
+static unsigned exec_opcode_dcb(
     z80* const z, const uint8_t opcode, const uint16_t addr);
-static void exec_opcode_ed(z80* const z, uint8_t opcode);
-static void exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz);
+static unsigned exec_opcode_ed(z80* const z, uint8_t opcode);
+static unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz);
 
 // MARK: opcodes
 // jumps to an address
@@ -161,13 +161,15 @@ static inline void call(z80* const z, uint16_t addr) {
 }
 
 // calls to next word in memory if condition is true
-static inline void cond_call(z80* const z, bool condition) {
+static inline unsigned cond_call(z80* const z, bool condition) {
   const uint16_t addr = nextw(z);
+  unsigned cyc = 0;
   if (condition) {
     call(z, addr);
-    z->cyc += 7;
+    cyc = 7;
   }
   z->mem_ptr = addr;
+  return cyc;
 }
 
 // returns from subroutine
@@ -177,11 +179,12 @@ static inline void ret(z80* const z) {
 }
 
 // returns from subroutine if condition is true
-static inline void cond_ret(z80* const z, bool condition) {
+static inline unsigned cond_ret(z80* const z, bool condition) {
   if (condition) {
     ret(z);
-    z->cyc += 6;
+    return 6;
   }
+  return 0;
 }
 
 static inline void jr(z80* const z, int8_t displacement) {
@@ -189,12 +192,13 @@ static inline void jr(z80* const z, int8_t displacement) {
   z->mem_ptr = z->pc;
 }
 
-static inline void cond_jr(z80* const z, bool condition) {
+static inline unsigned cond_jr(z80* const z, bool condition) {
   const int8_t b = nextb(z);
   if (condition) {
     jr(z, b);
-    z->cyc += 5;
+    return 5;
   }
+  return 0;
 }
 
 // ADD Byte: adds two bytes together
@@ -639,7 +643,8 @@ static inline uint16_t displace(
   return addr;
 }
 
-static inline void process_interrupts(z80* const z) {
+static inline unsigned process_interrupts(z80* const z) {
+  unsigned cyc = 0;
   // "When an EI instruction is executed, any pending interrupt request
   // is not accepted until after the instruction following EI is executed."
   if (z->iff_delay > 0) {
@@ -648,7 +653,7 @@ static inline void process_interrupts(z80* const z) {
       z->iff1 = 1;
       z->iff2 = 1;
     }
-    return;
+    return cyc;
   }
 
   if (z->nmi_pending) {
@@ -657,9 +662,9 @@ static inline void process_interrupts(z80* const z) {
     z->iff1 = 0;
     inc_r(z);
 
-    z->cyc += 11;
+    cyc += 11;
     call(z, 0x66);
-    return;
+    return cyc;
   }
 
   if (z->int_pending && z->iff1) {
@@ -671,17 +676,17 @@ static inline void process_interrupts(z80* const z) {
 
     switch (z->interrupt_mode) {
     case 0:
-      z->cyc += 11;
-      exec_opcode(z, z->int_data);
+      cyc += 11;
+      cyc += exec_opcode(z, z->int_data);
       break;
 
     case 1:
-      z->cyc += 13;
+      cyc += 13;
       call(z, 0x38);
       break;
 
     case 2:
-      z->cyc += 19;
+      cyc += 19;
       call(z, rw(z, (z->i << 8) | z->int_data));
       break;
 
@@ -690,8 +695,9 @@ static inline void process_interrupts(z80* const z) {
       break;
     }
 
-    return;
+    return cyc;
   }
+  return cyc;
 }
 
 // MARK: interface
@@ -703,8 +709,6 @@ void z80_init(z80* const z) {
   z->port_in = NULL;
   z->port_out = NULL;
   z->userdata = NULL;
-
-  z->cyc = 0;
 
   z->pc = 0;
   z->sp = 0xFFFF;
@@ -738,15 +742,17 @@ void z80_init(z80* const z) {
 }
 
 // executes the next instruction in memory + handles interrupts
-void z80_step(z80* const z) {
+unsigned z80_step(z80* const z) {
+  unsigned cyc = 0;
   if (z->halted) {
-    exec_opcode(z, 0x00);
+    cyc += exec_opcode(z, 0x00);
   } else {
     const uint8_t opcode = nextb(z);
-    exec_opcode(z, opcode);
+    cyc += exec_opcode(z, opcode);
   }
 
-  process_interrupts(z);
+  cyc += process_interrupts(z);
+  return cyc;
 }
 
 // outputs to stdout a debug trace of the emulator
@@ -777,8 +783,8 @@ void z80_clr_int(z80* const z) {
 }
 
 // executes a non-prefixed opcode
-void exec_opcode(z80* const z, uint8_t opcode) {
-  z->cyc += cyc_00[opcode];
+unsigned exec_opcode(z80* const z, uint8_t opcode) {
+  unsigned cyc = cyc_00[opcode];
   inc_r(z);
 
   switch (opcode) {
@@ -1126,34 +1132,34 @@ void exec_opcode(z80* const z, uint8_t opcode) {
   case 0xF2: cond_jump(z, flag_get(z, sf) == 0); break; // jp p, **
   case 0xFA: cond_jump(z, flag_get(z, sf) == 1); break; // jp m, **
 
-  case 0x10: cond_jr(z, --z->b != 0); break; // djnz *
+  case 0x10: cyc += cond_jr(z, --z->b != 0); break; // djnz *
   case 0x18: z->pc += (int8_t) nextb(z); break; // jr *
-  case 0x20: cond_jr(z, flag_get(z, zf) == 0); break; // jr nz, *
-  case 0x28: cond_jr(z, flag_get(z, zf) == 1); break; // jr z, *
-  case 0x30: cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
-  case 0x38: cond_jr(z, flag_get(z, cf) == 1); break; // jr c, *
+  case 0x20: cyc += cond_jr(z, flag_get(z, zf) == 0); break; // jr nz, *
+  case 0x28: cyc += cond_jr(z, flag_get(z, zf) == 1); break; // jr z, *
+  case 0x30: cyc += cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
+  case 0x38: cyc += cond_jr(z, flag_get(z, cf) == 1); break; // jr c, *
 
   case 0xE9: z->pc = z->hl; break; // jp (hl)
   case 0xCD: call(z, nextw(z)); break; // call
 
-  case 0xC4: cond_call(z, flag_get(z, zf) == 0); break; // cnz
-  case 0xCC: cond_call(z, flag_get(z, zf) == 1); break; // cz
-  case 0xD4: cond_call(z, flag_get(z, cf) == 0); break; // cnc
-  case 0xDC: cond_call(z, flag_get(z, cf) == 1); break; // cc
-  case 0xE4: cond_call(z, flag_get(z, pf) == 0); break; // cpo
-  case 0xEC: cond_call(z, flag_get(z, pf) == 1); break; // cpe
-  case 0xF4: cond_call(z, flag_get(z, sf) == 0); break; // cp
-  case 0xFC: cond_call(z, flag_get(z, sf) == 1); break; // cm
+  case 0xC4: cyc += cond_call(z, flag_get(z, zf) == 0); break; // cnz
+  case 0xCC: cyc += cond_call(z, flag_get(z, zf) == 1); break; // cz
+  case 0xD4: cyc += cond_call(z, flag_get(z, cf) == 0); break; // cnc
+  case 0xDC: cyc += cond_call(z, flag_get(z, cf) == 1); break; // cc
+  case 0xE4: cyc += cond_call(z, flag_get(z, pf) == 0); break; // cpo
+  case 0xEC: cyc += cond_call(z, flag_get(z, pf) == 1); break; // cpe
+  case 0xF4: cyc += cond_call(z, flag_get(z, sf) == 0); break; // cp
+  case 0xFC: cyc += cond_call(z, flag_get(z, sf) == 1); break; // cm
 
   case 0xC9: ret(z); break; // ret
-  case 0xC0: cond_ret(z, flag_get(z, zf) == 0); break; // ret nz
-  case 0xC8: cond_ret(z, flag_get(z, zf) == 1); break; // ret z
-  case 0xD0: cond_ret(z, flag_get(z, cf) == 0); break; // ret nc
-  case 0xD8: cond_ret(z, flag_get(z, cf) == 1); break; // ret c
-  case 0xE0: cond_ret(z, flag_get(z, pf) == 0); break; // ret po
-  case 0xE8: cond_ret(z, flag_get(z, pf) == 1); break; // ret pe
-  case 0xF0: cond_ret(z, flag_get(z, sf) == 0); break; // ret p
-  case 0xF8: cond_ret(z, flag_get(z, sf) == 1); break; // ret m
+  case 0xC0: cyc += cond_ret(z, flag_get(z, zf) == 0); break; // ret nz
+  case 0xC8: cyc += cond_ret(z, flag_get(z, zf) == 1); break; // ret z
+  case 0xD0: cyc += cond_ret(z, flag_get(z, cf) == 0); break; // ret nc
+  case 0xD8: cyc += cond_ret(z, flag_get(z, cf) == 1); break; // ret c
+  case 0xE0: cyc += cond_ret(z, flag_get(z, pf) == 0); break; // ret po
+  case 0xE8: cyc += cond_ret(z, flag_get(z, pf) == 1); break; // ret pe
+  case 0xF0: cyc += cond_ret(z, flag_get(z, sf) == 0); break; // ret p
+  case 0xF8: cyc += cond_ret(z, flag_get(z, sf) == 1); break; // ret m
 
   case 0xC7: call(z, 0x00); break; // rst 0
   case 0xCF: call(z, 0x08); break; // rst 1
@@ -1204,18 +1210,19 @@ void exec_opcode(z80* const z, uint8_t opcode) {
     z->h_l_ = hl;
   } break; // exx
 
-  case 0xCB: exec_opcode_cb(z, nextb(z)); break;
-  case 0xED: exec_opcode_ed(z, nextb(z)); break;
-  case 0xDD: exec_opcode_ddfd(z, nextb(z), &z->ix); break;
-  case 0xFD: exec_opcode_ddfd(z, nextb(z), &z->iy); break;
+  case 0xCB: cyc += exec_opcode_cb(z, nextb(z)); break;
+  case 0xED: cyc += exec_opcode_ed(z, nextb(z)); break;
+  case 0xDD: cyc += exec_opcode_ddfd(z, nextb(z), &z->ix); break;
+  case 0xFD: cyc += exec_opcode_ddfd(z, nextb(z), &z->iy); break;
 
   default: break; // fprintf(stderr, "unknown opcode %02X\n", opcode); break;
   }
+  return cyc;
 }
 
 // executes a DD/FD opcode (IZ = IX or IY)
-void exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
-  z->cyc += cyc_ddfd[opcode];
+unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
+  unsigned cyc = cyc_ddfd[opcode];
   inc_r(z);
 
 #define IZD displace(z, *iz, nextb(z))
@@ -1349,12 +1356,12 @@ void exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
   case 0xCB: {
     uint16_t addr = IZD;
     uint8_t op = nextb(z);
-    exec_opcode_dcb(z, op, addr);
+    cyc += exec_opcode_dcb(z, op, addr);
   } break;
 
   default: {
     // any other FD/DD opcode behaves as a non-prefixed opcode:
-    exec_opcode(z, opcode);
+    cyc += exec_opcode(z, opcode);
     // R should not be incremented twice:
     z->r = (z->r & 0x80) | ((z->r - 1) & 0x7f);
   } break;
@@ -1363,11 +1370,12 @@ void exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
 #undef IZD
 #undef IZH
 #undef IZL
+  return cyc;
 }
 
 // executes a CB opcode
-void exec_opcode_cb(z80* const z, uint8_t opcode) {
-  z->cyc += 8;
+unsigned exec_opcode_cb(z80* const z, uint8_t opcode) {
+  unsigned cyc = 8;
   inc_r(z);
 
   // decoding instructions from http://z80.info/decoding.htm#cb
@@ -1411,7 +1419,7 @@ void exec_opcode_cb(z80* const z, uint8_t opcode) {
     if (z_ == 6) {
       flag_set(z, yf, GET_BIT(5, z->mem_ptr >> 8));
       flag_set(z, xf, GET_BIT(3, z->mem_ptr >> 8));
-      z->cyc += 4;
+      cyc += 4;
     }
   } break;
   case 2: *reg &= ~(1 << y_); break; // RES y, r[z]
@@ -1420,12 +1428,14 @@ void exec_opcode_cb(z80* const z, uint8_t opcode) {
 
   if ((x_ != 1) && (z_ == 6)) { // BIT (HL) not included
     wb(z, z->hl, hl);
-    z->cyc += 7;
+    cyc += 7;
   }
+  return cyc;
 }
 
 // executes a displaced CB opcode (DDCB or FDCB)
-void exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
+unsigned exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
+  unsigned cyc = 0;
   uint8_t val = rb(z, addr);
   uint8_t result = 0;
 
@@ -1478,16 +1488,17 @@ void exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
 
   if (x_ == 1) {
     // bit instructions take 20 cycles, others take 23
-    z->cyc += 20;
+    cyc += 20;
   } else {
     wb(z, addr, result);
-    z->cyc += 23;
+    cyc += 23;
   }
+  return cyc;
 }
 
 // executes a ED opcode
-void exec_opcode_ed(z80* const z, uint8_t opcode) {
-  z->cyc += cyc_ed[opcode];
+unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
+  unsigned cyc = cyc_ed[opcode];
   inc_r(z);
   switch (opcode) {
   case 0x47: z->i = z->a; break; // ld i,a
@@ -1529,7 +1540,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
 
     if (z->bc != 0) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
       z->mem_ptr = z->pc + 1;
     }
   } break; // ldir
@@ -1540,7 +1551,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
 
     if (z->bc != 0) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
       z->mem_ptr = z->pc + 1;
     }
   } break; // lddr
@@ -1551,7 +1562,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     cpi(z);
     if (z->bc != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
       z->mem_ptr = z->pc + 1;
     } else {
       z->mem_ptr += 1;
@@ -1561,7 +1572,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     cpd(z);
     if (z->bc != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
     } else {
       z->mem_ptr += 1;
     }
@@ -1587,7 +1598,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     ini(z);
     if (z->b > 0) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
     }
     break; // inir
   case 0xAA: ind(z); break; // ind
@@ -1595,7 +1606,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     ind(z);
     if (z->b > 0) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
     }
     break; // indr
 
@@ -1616,7 +1627,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     outi(z);
     if (z->b > 0) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
     }
   } break; // otir
   case 0xAB: outd(z); break; // outd
@@ -1624,7 +1635,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
     outd(z);
     if (z->b > 0) {
       z->pc -= 2;
-      z->cyc += 5;
+      cyc += 5;
     }
   } break; // otdr
 
@@ -1740,6 +1751,7 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   default: break;
   //fprintf(stderr, "unknown ED opcode: %02X\n", opcode); break;
   }
+  return cyc;
 }
 
 #undef GET_BIT
