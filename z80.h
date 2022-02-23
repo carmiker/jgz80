@@ -15,6 +15,10 @@
 #define Z80REG(A, B) union {struct { uint8_t A, B; }; uint16_t A ## B;}
 #endif
 
+#ifndef Z80_EXPORT
+#define Z80_EXPORT
+#endif
+
 typedef struct z80 z80;
 struct z80 {
   uint8_t (*read_byte)(void*, uint16_t);
@@ -42,12 +46,12 @@ struct z80 {
   bool int_pending : 1, nmi_pending : 1;
 };
 
-void z80_init(z80* const z);
-unsigned z80_step(z80* const z); /* return cycles used */
-unsigned z80_step_n(z80* const z, unsigned cycles);
-void z80_debug_output(z80* const z);
-void z80_gen_nmi(z80* const z);
-void z80_gen_int(z80* const z, uint8_t data);
-void z80_clr_int(z80* const z);
+Z80_EXPORT void z80_init(z80* const z);
+Z80_EXPORT unsigned z80_step(z80* const z); /* return cycles used */
+Z80_EXPORT unsigned z80_step_n(z80* const z, unsigned cycles);
+Z80_EXPORT void z80_debug_output(z80* const z);
+Z80_EXPORT void z80_gen_nmi(z80* const z);
+Z80_EXPORT void z80_gen_int(z80* const z, uint8_t data);
+Z80_EXPORT void z80_clr_int(z80* const z);
 
 #endif // Z80_Z80_H_

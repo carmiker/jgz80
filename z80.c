@@ -700,7 +700,7 @@ static inline unsigned process_interrupts(z80* const z) {
 // MARK: interface
 // initialises a z80 struct. Note that read_byte, write_byte, port_in, port_out
 // and userdata must be manually set by the user afterwards.
-void z80_init(z80* const z) {
+Z80_EXPORT void z80_init(z80* const z) {
   z->read_byte = NULL;
   z->write_byte = NULL;
   z->port_in = NULL;
@@ -752,13 +752,13 @@ static unsigned z80_step_s(z80* const z) {
 }
 
 // executes the next instruction in memory + handles interrupts
-unsigned z80_step(z80* const z) {
+Z80_EXPORT unsigned z80_step(z80* const z) {
   return z80_step_s(z);
 }
 
 // executes the next instructions in memory + handles interrupts,
 // until the cycle count is >= the requested amount.
-unsigned z80_step_n(z80* const z, unsigned cycles) {
+Z80_EXPORT unsigned z80_step_n(z80* const z, unsigned cycles) {
   unsigned cyc = 0;
   while (cyc < cycles) {
     cyc += z80_step_s(z);
@@ -767,7 +767,7 @@ unsigned z80_step_n(z80* const z, unsigned cycles) {
 }
 
 // outputs to stdout a debug trace of the emulator
-void z80_debug_output(z80* const z) {
+Z80_EXPORT void z80_debug_output(z80* const z) {
   if (z) { }
   /*printf("PC: %04X, AF: %04X, BC: %04X, DE: %04X, HL: %04X, SP: %04X, "
          "IX: %04X, IY: %04X, I: %02X, R: %02X",
@@ -779,17 +779,17 @@ void z80_debug_output(z80* const z) {
 }
 
 // function to call when an NMI is to be serviced
-void z80_gen_nmi(z80* const z) {
+Z80_EXPORT void z80_gen_nmi(z80* const z) {
   z->nmi_pending = 1;
 }
 
 // function to call when an INT is to be serviced
-void z80_gen_int(z80* const z, uint8_t data) {
+Z80_EXPORT void z80_gen_int(z80* const z, uint8_t data) {
   z->int_pending = 1;
   z->int_data = data;
 }
 
-void z80_clr_int(z80* const z) {
+Z80_EXPORT void z80_clr_int(z80* const z) {
     z->int_pending = 0;
 }
 
