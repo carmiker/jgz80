@@ -58,16 +58,16 @@ enum z80_flagbit {
 #define GET_BIT(n, val) (((val) >> (n)) & 1)
 
 static inline uint8_t flag_val(enum z80_flagbit bit, bool cond) {
-	return (!!cond) << bit;
+  return (!!cond) << bit;
 }
 
 static inline bool flag_get(z80* const z, enum z80_flagbit bit) {
-	return !!(z->f & (1 << bit));
+  return !!(z->f & (1 << bit));
 }
 
 static inline void flag_set(z80* const z, enum z80_flagbit bit, bool val) {
-	z->f &= ~(1<<bit);
-	z->f |= (!!val) << bit;
+  z->f &= ~(1<<bit);
+  z->f |= (!!val) << bit;
 }
 
 static inline uint8_t rb(z80* const z, uint16_t addr) {
