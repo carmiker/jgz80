@@ -6,19 +6,6 @@
 #endif
 
 // MARK: timings
-static const uint8_t cyc_00[256] = {4, 10, 7, 6, 4, 4, 7, 4, 4, 11, 7, 6, 4, 4,
-    7, 4, 8, 10, 7, 6, 4, 4, 7, 4, 12, 11, 7, 6, 4, 4, 7, 4, 7, 10, 16, 6, 4, 4,
-    7, 4, 7, 11, 16, 6, 4, 4, 7, 4, 7, 10, 13, 6, 11, 11, 10, 4, 7, 11, 13, 6,
-    4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4,
-    4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4,
-    7, 4, 7, 7, 7, 7, 7, 7, 4, 7, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7,
-    4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4,
-    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, 4,
-    4, 4, 4, 4, 4, 7, 4, 5, 10, 10, 10, 10, 11, 7, 11, 5, 10, 10, 0, 10, 17, 7,
-    11, 5, 10, 10, 11, 10, 11, 7, 11, 5, 4, 10, 11, 10, 0, 7, 11, 5, 10, 10, 19,
-    10, 11, 7, 11, 5, 4, 10, 4, 10, 0, 7, 11, 5, 10, 10, 4, 10, 11, 7, 11, 5, 6,
-    10, 4, 10, 0, 7, 11};
-
 static const uint8_t cyc_ed[256] = {8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 12,
@@ -800,243 +787,253 @@ Z80_EXPORT void z80_clr_int(z80* const z) {
 
 // executes a non-prefixed opcode
 static unsigned exec_opcode(z80* const z, uint8_t opcode) {
-  unsigned cyc = cyc_00[opcode];
+  unsigned cyc = 0;
   inc_r(z);
 
   switch (opcode) {
-  case 0x7F: z->a = z->a; break; // ld a,a
-  case 0x78: z->a = z->b; break; // ld a,b
-  case 0x79: z->a = z->c; break; // ld a,c
-  case 0x7A: z->a = z->d; break; // ld a,d
-  case 0x7B: z->a = z->e; break; // ld a,e
-  case 0x7C: z->a = z->h; break; // ld a,h
-  case 0x7D: z->a = z->l; break; // ld a,l
+  case 0x7F: cyc += 4; z->a = z->a; break; // ld a,a
+  case 0x78: cyc += 4; z->a = z->b; break; // ld a,b
+  case 0x79: cyc += 4; z->a = z->c; break; // ld a,c
+  case 0x7A: cyc += 4; z->a = z->d; break; // ld a,d
+  case 0x7B: cyc += 4; z->a = z->e; break; // ld a,e
+  case 0x7C: cyc += 4; z->a = z->h; break; // ld a,h
+  case 0x7D: cyc += 4; z->a = z->l; break; // ld a,l
 
-  case 0x47: z->b = z->a; break; // ld b,a
-  case 0x40: z->b = z->b; break; // ld b,b
-  case 0x41: z->b = z->c; break; // ld b,c
-  case 0x42: z->b = z->d; break; // ld b,d
-  case 0x43: z->b = z->e; break; // ld b,e
-  case 0x44: z->b = z->h; break; // ld b,h
-  case 0x45: z->b = z->l; break; // ld b,l
+  case 0x47: cyc += 4; z->b = z->a; break; // ld b,a
+  case 0x40: cyc += 4; z->b = z->b; break; // ld b,b
+  case 0x41: cyc += 4; z->b = z->c; break; // ld b,c
+  case 0x42: cyc += 4; z->b = z->d; break; // ld b,d
+  case 0x43: cyc += 4; z->b = z->e; break; // ld b,e
+  case 0x44: cyc += 4; z->b = z->h; break; // ld b,h
+  case 0x45: cyc += 4; z->b = z->l; break; // ld b,l
 
-  case 0x4F: z->c = z->a; break; // ld c,a
-  case 0x48: z->c = z->b; break; // ld c,b
-  case 0x49: z->c = z->c; break; // ld c,c
-  case 0x4A: z->c = z->d; break; // ld c,d
-  case 0x4B: z->c = z->e; break; // ld c,e
-  case 0x4C: z->c = z->h; break; // ld c,h
-  case 0x4D: z->c = z->l; break; // ld c,l
+  case 0x4F: cyc += 4; z->c = z->a; break; // ld c,a
+  case 0x48: cyc += 4; z->c = z->b; break; // ld c,b
+  case 0x49: cyc += 4; z->c = z->c; break; // ld c,c
+  case 0x4A: cyc += 4; z->c = z->d; break; // ld c,d
+  case 0x4B: cyc += 4; z->c = z->e; break; // ld c,e
+  case 0x4C: cyc += 4; z->c = z->h; break; // ld c,h
+  case 0x4D: cyc += 4; z->c = z->l; break; // ld c,l
 
-  case 0x57: z->d = z->a; break; // ld d,a
-  case 0x50: z->d = z->b; break; // ld d,b
-  case 0x51: z->d = z->c; break; // ld d,c
-  case 0x52: z->d = z->d; break; // ld d,d
-  case 0x53: z->d = z->e; break; // ld d,e
-  case 0x54: z->d = z->h; break; // ld d,h
-  case 0x55: z->d = z->l; break; // ld d,l
+  case 0x57: cyc += 4; z->d = z->a; break; // ld d,a
+  case 0x50: cyc += 4; z->d = z->b; break; // ld d,b
+  case 0x51: cyc += 4; z->d = z->c; break; // ld d,c
+  case 0x52: cyc += 4; z->d = z->d; break; // ld d,d
+  case 0x53: cyc += 4; z->d = z->e; break; // ld d,e
+  case 0x54: cyc += 4; z->d = z->h; break; // ld d,h
+  case 0x55: cyc += 4; z->d = z->l; break; // ld d,l
 
-  case 0x5F: z->e = z->a; break; // ld e,a
-  case 0x58: z->e = z->b; break; // ld e,b
-  case 0x59: z->e = z->c; break; // ld e,c
-  case 0x5A: z->e = z->d; break; // ld e,d
-  case 0x5B: z->e = z->e; break; // ld e,e
-  case 0x5C: z->e = z->h; break; // ld e,h
-  case 0x5D: z->e = z->l; break; // ld e,l
+  case 0x5F: cyc += 4; z->e = z->a; break; // ld e,a
+  case 0x58: cyc += 4; z->e = z->b; break; // ld e,b
+  case 0x59: cyc += 4; z->e = z->c; break; // ld e,c
+  case 0x5A: cyc += 4; z->e = z->d; break; // ld e,d
+  case 0x5B: cyc += 4; z->e = z->e; break; // ld e,e
+  case 0x5C: cyc += 4; z->e = z->h; break; // ld e,h
+  case 0x5D: cyc += 4; z->e = z->l; break; // ld e,l
 
-  case 0x67: z->h = z->a; break; // ld h,a
-  case 0x60: z->h = z->b; break; // ld h,b
-  case 0x61: z->h = z->c; break; // ld h,c
-  case 0x62: z->h = z->d; break; // ld h,d
-  case 0x63: z->h = z->e; break; // ld h,e
-  case 0x64: z->h = z->h; break; // ld h,h
-  case 0x65: z->h = z->l; break; // ld h,l
+  case 0x67: cyc += 4; z->h = z->a; break; // ld h,a
+  case 0x60: cyc += 4; z->h = z->b; break; // ld h,b
+  case 0x61: cyc += 4; z->h = z->c; break; // ld h,c
+  case 0x62: cyc += 4; z->h = z->d; break; // ld h,d
+  case 0x63: cyc += 4; z->h = z->e; break; // ld h,e
+  case 0x64: cyc += 4; z->h = z->h; break; // ld h,h
+  case 0x65: cyc += 4; z->h = z->l; break; // ld h,l
 
-  case 0x6F: z->l = z->a; break; // ld l,a
-  case 0x68: z->l = z->b; break; // ld l,b
-  case 0x69: z->l = z->c; break; // ld l,c
-  case 0x6A: z->l = z->d; break; // ld l,d
-  case 0x6B: z->l = z->e; break; // ld l,e
-  case 0x6C: z->l = z->h; break; // ld l,h
-  case 0x6D: z->l = z->l; break; // ld l,l
+  case 0x6F: cyc += 4; z->l = z->a; break; // ld l,a
+  case 0x68: cyc += 4; z->l = z->b; break; // ld l,b
+  case 0x69: cyc += 4; z->l = z->c; break; // ld l,c
+  case 0x6A: cyc += 4; z->l = z->d; break; // ld l,d
+  case 0x6B: cyc += 4; z->l = z->e; break; // ld l,e
+  case 0x6C: cyc += 4; z->l = z->h; break; // ld l,h
+  case 0x6D: cyc += 4; z->l = z->l; break; // ld l,l
 
-  case 0x7E: z->a = rb(z, z->hl); break; // ld a,(hl)
-  case 0x46: z->b = rb(z, z->hl); break; // ld b,(hl)
-  case 0x4E: z->c = rb(z, z->hl); break; // ld c,(hl)
-  case 0x56: z->d = rb(z, z->hl); break; // ld d,(hl)
-  case 0x5E: z->e = rb(z, z->hl); break; // ld e,(hl)
-  case 0x66: z->h = rb(z, z->hl); break; // ld h,(hl)
-  case 0x6E: z->l = rb(z, z->hl); break; // ld l,(hl)
+  case 0x7E: cyc += 7; z->a = rb(z, z->hl); break; // ld a,(hl)
+  case 0x46: cyc += 7; z->b = rb(z, z->hl); break; // ld b,(hl)
+  case 0x4E: cyc += 7; z->c = rb(z, z->hl); break; // ld c,(hl)
+  case 0x56: cyc += 7; z->d = rb(z, z->hl); break; // ld d,(hl)
+  case 0x5E: cyc += 7; z->e = rb(z, z->hl); break; // ld e,(hl)
+  case 0x66: cyc += 7; z->h = rb(z, z->hl); break; // ld h,(hl)
+  case 0x6E: cyc += 7; z->l = rb(z, z->hl); break; // ld l,(hl)
 
-  case 0x77: wb(z, z->hl, z->a); break; // ld (hl),a
-  case 0x70: wb(z, z->hl, z->b); break; // ld (hl),b
-  case 0x71: wb(z, z->hl, z->c); break; // ld (hl),c
-  case 0x72: wb(z, z->hl, z->d); break; // ld (hl),d
-  case 0x73: wb(z, z->hl, z->e); break; // ld (hl),e
-  case 0x74: wb(z, z->hl, z->h); break; // ld (hl),h
-  case 0x75: wb(z, z->hl, z->l); break; // ld (hl),l
+  case 0x77: cyc += 7; wb(z, z->hl, z->a); break; // ld (hl),a
+  case 0x70: cyc += 7; wb(z, z->hl, z->b); break; // ld (hl),b
+  case 0x71: cyc += 7; wb(z, z->hl, z->c); break; // ld (hl),c
+  case 0x72: cyc += 7; wb(z, z->hl, z->d); break; // ld (hl),d
+  case 0x73: cyc += 7; wb(z, z->hl, z->e); break; // ld (hl),e
+  case 0x74: cyc += 7; wb(z, z->hl, z->h); break; // ld (hl),h
+  case 0x75: cyc += 7; wb(z, z->hl, z->l); break; // ld (hl),l
 
-  case 0x3E: z->a = nextb(z); break; // ld a,*
-  case 0x06: z->b = nextb(z); break; // ld b,*
-  case 0x0E: z->c = nextb(z); break; // ld c,*
-  case 0x16: z->d = nextb(z); break; // ld d,*
-  case 0x1E: z->e = nextb(z); break; // ld e,*
-  case 0x26: z->h = nextb(z); break; // ld h,*
-  case 0x2E: z->l = nextb(z); break; // ld l,*
-  case 0x36: wb(z, z->hl, nextb(z)); break; // ld (hl),*
+  case 0x3E: cyc += 7; z->a = nextb(z); break; // ld a,*
+  case 0x06: cyc += 7; z->b = nextb(z); break; // ld b,*
+  case 0x0E: cyc += 7; z->c = nextb(z); break; // ld c,*
+  case 0x16: cyc += 7; z->d = nextb(z); break; // ld d,*
+  case 0x1E: cyc += 7; z->e = nextb(z); break; // ld e,*
+  case 0x26: cyc += 7; z->h = nextb(z); break; // ld h,*
+  case 0x2E: cyc += 7; z->l = nextb(z); break; // ld l,*
+  case 0x36: cyc += 10; wb(z, z->hl, nextb(z)); break; // ld (hl),*
 
   case 0x0A:
+    cyc += 7;
     z->a = rb(z, z->bc);
     z->mem_ptr = z->bc + 1;
     break; // ld a,(bc)
   case 0x1A:
+    cyc += 7;
     z->a = rb(z, z->de);
     z->mem_ptr = z->de + 1;
     break; // ld a,(de)
   case 0x3A: {
+    cyc += 13;
     const uint16_t addr = nextw(z);
     z->a = rb(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld a,(**)
 
   case 0x02:
+    cyc += 7;
     wb(z, z->bc, z->a);
     z->mem_ptr = (z->a << 8) | ((z->bc + 1) & 0xFF);
     break; // ld (bc),a
 
   case 0x12:
+    cyc += 7;
     wb(z, z->de, z->a);
     z->mem_ptr = (z->a << 8) | ((z->de + 1) & 0xFF);
     break; // ld (de),a
 
   case 0x32: {
+    cyc += 13;
     const uint16_t addr = nextw(z);
     wb(z, addr, z->a);
     z->mem_ptr = (z->a << 8) | ((addr + 1) & 0xFF);
   } break; // ld (**),a
 
-  case 0x01: z->bc = nextw(z); break; // ld bc,**
-  case 0x11: z->de = nextw(z); break; // ld de,**
-  case 0x21: z->hl = nextw(z); break; // ld hl,**
-  case 0x31: z->sp = nextw(z); break; // ld sp,**
+  case 0x01: cyc += 10; z->bc = nextw(z); break; // ld bc,**
+  case 0x11: cyc += 10; z->de = nextw(z); break; // ld de,**
+  case 0x21: cyc += 10; z->hl = nextw(z); break; // ld hl,**
+  case 0x31: cyc += 10; z->sp = nextw(z); break; // ld sp,**
 
   case 0x2A: {
+    cyc += 16;
     const uint16_t addr = nextw(z);
     z->hl = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld hl,(**)
 
   case 0x22: {
+    cyc += 16;
     const uint16_t addr = nextw(z);
     ww(z, addr, z->hl);
     z->mem_ptr = addr + 1;
   } break; // ld (**),hl
 
-  case 0xF9: z->sp = z->hl; break; // ld sp,hl
+  case 0xF9: cyc += 6; z->sp = z->hl; break; // ld sp,hl
 
   case 0xEB: {
+    cyc += 4;
     const uint16_t de = z->de;
     z->de = z->hl;
     z->hl = de;
   } break; // ex de,hl
 
   case 0xE3: {
+    cyc += 19;
     const uint16_t val = rw(z, z->sp);
     ww(z, z->sp, z->hl);
     z->hl = val;
     z->mem_ptr = val;
   } break; // ex (sp),hl
 
-  case 0x87: z->a = addb(z, z->a, z->a, 0); break; // add a,a
-  case 0x80: z->a = addb(z, z->a, z->b, 0); break; // add a,b
-  case 0x81: z->a = addb(z, z->a, z->c, 0); break; // add a,c
-  case 0x82: z->a = addb(z, z->a, z->d, 0); break; // add a,d
-  case 0x83: z->a = addb(z, z->a, z->e, 0); break; // add a,e
-  case 0x84: z->a = addb(z, z->a, z->h, 0); break; // add a,h
-  case 0x85: z->a = addb(z, z->a, z->l, 0); break; // add a,l
-  case 0x86: z->a = addb(z, z->a, rb(z, z->hl), 0); break; // add a,(hl)
-  case 0xC6: z->a = addb(z, z->a, nextb(z), 0); break; // add a,*
+  case 0x87: cyc += 4; z->a = addb(z, z->a, z->a, 0); break; // add a,a
+  case 0x80: cyc += 4; z->a = addb(z, z->a, z->b, 0); break; // add a,b
+  case 0x81: cyc += 4; z->a = addb(z, z->a, z->c, 0); break; // add a,c
+  case 0x82: cyc += 4; z->a = addb(z, z->a, z->d, 0); break; // add a,d
+  case 0x83: cyc += 4; z->a = addb(z, z->a, z->e, 0); break; // add a,e
+  case 0x84: cyc += 4; z->a = addb(z, z->a, z->h, 0); break; // add a,h
+  case 0x85: cyc += 4; z->a = addb(z, z->a, z->l, 0); break; // add a,l
+  case 0x86: cyc += 7; z->a = addb(z, z->a, rb(z, z->hl), 0); break; // add a,(hl)
+  case 0xC6: cyc += 7; z->a = addb(z, z->a, nextb(z), 0); break; // add a,*
 
-  case 0x8F: z->a = addb(z, z->a, z->a, flag_get(z, cf)); break; // adc a,a
-  case 0x88: z->a = addb(z, z->a, z->b, flag_get(z, cf)); break; // adc a,b
-  case 0x89: z->a = addb(z, z->a, z->c, flag_get(z, cf)); break; // adc a,c
-  case 0x8A: z->a = addb(z, z->a, z->d, flag_get(z, cf)); break; // adc a,d
-  case 0x8B: z->a = addb(z, z->a, z->e, flag_get(z, cf)); break; // adc a,e
-  case 0x8C: z->a = addb(z, z->a, z->h, flag_get(z, cf)); break; // adc a,h
-  case 0x8D: z->a = addb(z, z->a, z->l, flag_get(z, cf)); break; // adc a,l
-  case 0x8E: z->a = addb(z, z->a, rb(z, z->hl), flag_get(z, cf)); break; // adc a,(hl)
-  case 0xCE: z->a = addb(z, z->a, nextb(z), flag_get(z, cf)); break; // adc a,*
+  case 0x8F: cyc += 4; z->a = addb(z, z->a, z->a, flag_get(z, cf)); break; // adc a,a
+  case 0x88: cyc += 4; z->a = addb(z, z->a, z->b, flag_get(z, cf)); break; // adc a,b
+  case 0x89: cyc += 4; z->a = addb(z, z->a, z->c, flag_get(z, cf)); break; // adc a,c
+  case 0x8A: cyc += 4; z->a = addb(z, z->a, z->d, flag_get(z, cf)); break; // adc a,d
+  case 0x8B: cyc += 4; z->a = addb(z, z->a, z->e, flag_get(z, cf)); break; // adc a,e
+  case 0x8C: cyc += 4; z->a = addb(z, z->a, z->h, flag_get(z, cf)); break; // adc a,h
+  case 0x8D: cyc += 4; z->a = addb(z, z->a, z->l, flag_get(z, cf)); break; // adc a,l
+  case 0x8E: cyc += 7; z->a = addb(z, z->a, rb(z, z->hl), flag_get(z, cf)); break; // adc a,(hl)
+  case 0xCE: cyc += 7; z->a = addb(z, z->a, nextb(z), flag_get(z, cf)); break; // adc a,*
 
-  case 0x97: z->a = subb(z, z->a, z->a, 0); break; // sub a,a
-  case 0x90: z->a = subb(z, z->a, z->b, 0); break; // sub a,b
-  case 0x91: z->a = subb(z, z->a, z->c, 0); break; // sub a,c
-  case 0x92: z->a = subb(z, z->a, z->d, 0); break; // sub a,d
-  case 0x93: z->a = subb(z, z->a, z->e, 0); break; // sub a,e
-  case 0x94: z->a = subb(z, z->a, z->h, 0); break; // sub a,h
-  case 0x95: z->a = subb(z, z->a, z->l, 0); break; // sub a,l
-  case 0x96: z->a = subb(z, z->a, rb(z, z->hl), 0); break; // sub a,(hl)
-  case 0xD6: z->a = subb(z, z->a, nextb(z), 0); break; // sub a,*
+  case 0x97: cyc += 4; z->a = subb(z, z->a, z->a, 0); break; // sub a,a
+  case 0x90: cyc += 4; z->a = subb(z, z->a, z->b, 0); break; // sub a,b
+  case 0x91: cyc += 4; z->a = subb(z, z->a, z->c, 0); break; // sub a,c
+  case 0x92: cyc += 4; z->a = subb(z, z->a, z->d, 0); break; // sub a,d
+  case 0x93: cyc += 4; z->a = subb(z, z->a, z->e, 0); break; // sub a,e
+  case 0x94: cyc += 4; z->a = subb(z, z->a, z->h, 0); break; // sub a,h
+  case 0x95: cyc += 4; z->a = subb(z, z->a, z->l, 0); break; // sub a,l
+  case 0x96: cyc += 7; z->a = subb(z, z->a, rb(z, z->hl), 0); break; // sub a,(hl)
+  case 0xD6: cyc += 7; z->a = subb(z, z->a, nextb(z), 0); break; // sub a,*
 
-  case 0x9F: z->a = subb(z, z->a, z->a, flag_get(z, cf)); break; // sbc a,a
-  case 0x98: z->a = subb(z, z->a, z->b, flag_get(z, cf)); break; // sbc a,b
-  case 0x99: z->a = subb(z, z->a, z->c, flag_get(z, cf)); break; // sbc a,c
-  case 0x9A: z->a = subb(z, z->a, z->d, flag_get(z, cf)); break; // sbc a,d
-  case 0x9B: z->a = subb(z, z->a, z->e, flag_get(z, cf)); break; // sbc a,e
-  case 0x9C: z->a = subb(z, z->a, z->h, flag_get(z, cf)); break; // sbc a,h
-  case 0x9D: z->a = subb(z, z->a, z->l, flag_get(z, cf)); break; // sbc a,l
-  case 0x9E: z->a = subb(z, z->a, rb(z, z->hl), flag_get(z, cf)); break; // sbc a,(hl)
-  case 0xDE: z->a = subb(z, z->a, nextb(z), flag_get(z, cf)); break; // sbc a,*
+  case 0x9F: cyc += 4; z->a = subb(z, z->a, z->a, flag_get(z, cf)); break; // sbc a,a
+  case 0x98: cyc += 4; z->a = subb(z, z->a, z->b, flag_get(z, cf)); break; // sbc a,b
+  case 0x99: cyc += 4; z->a = subb(z, z->a, z->c, flag_get(z, cf)); break; // sbc a,c
+  case 0x9A: cyc += 4; z->a = subb(z, z->a, z->d, flag_get(z, cf)); break; // sbc a,d
+  case 0x9B: cyc += 4; z->a = subb(z, z->a, z->e, flag_get(z, cf)); break; // sbc a,e
+  case 0x9C: cyc += 4; z->a = subb(z, z->a, z->h, flag_get(z, cf)); break; // sbc a,h
+  case 0x9D: cyc += 4; z->a = subb(z, z->a, z->l, flag_get(z, cf)); break; // sbc a,l
+  case 0x9E: cyc += 7; z->a = subb(z, z->a, rb(z, z->hl), flag_get(z, cf)); break; // sbc a,(hl)
+  case 0xDE: cyc += 7; z->a = subb(z, z->a, nextb(z), flag_get(z, cf)); break; // sbc a,*
 
-  case 0x09: addhl(z, z->bc); break; // add hl,bc
-  case 0x19: addhl(z, z->de); break; // add hl,de
-  case 0x29: addhl(z, z->hl); break; // add hl,hl
-  case 0x39: addhl(z, z->sp); break; // add hl,sp
+  case 0x09: cyc += 11; addhl(z, z->bc); break; // add hl,bc
+  case 0x19: cyc += 11; addhl(z, z->de); break; // add hl,de
+  case 0x29: cyc += 11; addhl(z, z->hl); break; // add hl,hl
+  case 0x39: cyc += 11; addhl(z, z->sp); break; // add hl,sp
 
-  case 0xF3:
-    z->iff1 = 0;
-    z->iff2 = 0;
-    break; // di
-  case 0xFB: z->iff_delay = 1; break; // ei
-  case 0x00: break; // nop
-  case 0x76: z->halted = 1; break; // halt
+  case 0xF3: cyc += 4; z->iff1 = z->iff2 = 0; break; // di
+  case 0xFB: cyc += 4; z->iff_delay = 1; break; // ei
+  case 0x00: cyc += 4; break; // nop
+  case 0x76: cyc += 4; z->halted = 1; break; // halt
 
-  case 0x3C: z->a = inc(z, z->a); break; // inc a
-  case 0x04: z->b = inc(z, z->b); break; // inc b
-  case 0x0C: z->c = inc(z, z->c); break; // inc c
-  case 0x14: z->d = inc(z, z->d); break; // inc d
-  case 0x1C: z->e = inc(z, z->e); break; // inc e
-  case 0x24: z->h = inc(z, z->h); break; // inc h
-  case 0x2C: z->l = inc(z, z->l); break; // inc l
+  case 0x3C: cyc += 4; z->a = inc(z, z->a); break; // inc a
+  case 0x04: cyc += 4; z->b = inc(z, z->b); break; // inc b
+  case 0x0C: cyc += 4; z->c = inc(z, z->c); break; // inc c
+  case 0x14: cyc += 4; z->d = inc(z, z->d); break; // inc d
+  case 0x1C: cyc += 4; z->e = inc(z, z->e); break; // inc e
+  case 0x24: cyc += 4; z->h = inc(z, z->h); break; // inc h
+  case 0x2C: cyc += 4; z->l = inc(z, z->l); break; // inc l
   case 0x34: {
+    cyc += 11;
     uint8_t result = inc(z, rb(z, z->hl));
     wb(z, z->hl, result);
   } break; // inc (hl)
 
-  case 0x3D: z->a = dec(z, z->a); break; // dec a
-  case 0x05: z->b = dec(z, z->b); break; // dec b
-  case 0x0D: z->c = dec(z, z->c); break; // dec c
-  case 0x15: z->d = dec(z, z->d); break; // dec d
-  case 0x1D: z->e = dec(z, z->e); break; // dec e
-  case 0x25: z->h = dec(z, z->h); break; // dec h
-  case 0x2D: z->l = dec(z, z->l); break; // dec l
+  case 0x3D: cyc += 4; z->a = dec(z, z->a); break; // dec a
+  case 0x05: cyc += 4; z->b = dec(z, z->b); break; // dec b
+  case 0x0D: cyc += 4; z->c = dec(z, z->c); break; // dec c
+  case 0x15: cyc += 4; z->d = dec(z, z->d); break; // dec d
+  case 0x1D: cyc += 4; z->e = dec(z, z->e); break; // dec e
+  case 0x25: cyc += 4; z->h = dec(z, z->h); break; // dec h
+  case 0x2D: cyc += 4; z->l = dec(z, z->l); break; // dec l
   case 0x35: {
+    cyc += 11;
     uint8_t result = dec(z, rb(z, z->hl));
     wb(z, z->hl, result);
   } break; // dec (hl)
 
-  case 0x03: ++z->bc; break; // inc bc
-  case 0x13: ++z->de; break; // inc de
-  case 0x23: ++z->hl; break; // inc hl
-  case 0x33: ++z->sp; break; // inc sp
+  case 0x03: cyc += 6; ++z->bc; break; // inc bc
+  case 0x13: cyc += 6; ++z->de; break; // inc de
+  case 0x23: cyc += 6; ++z->hl; break; // inc hl
+  case 0x33: cyc += 6; ++z->sp; break; // inc sp
 
-  case 0x0B: --z->bc; break; // dec bc
-  case 0x1B: --z->de; break; // dec de
-  case 0x2B: --z->hl; break; // dec hl
-  case 0x3B: --z->sp; break; // dec sp
+  case 0x0B: cyc += 6; --z->bc; break; // dec bc
+  case 0x1B: cyc += 6; --z->de; break; // dec de
+  case 0x2B: cyc += 6; --z->hl; break; // dec hl
+  case 0x3B: cyc += 6; --z->sp; break; // dec sp
 
-  case 0x27: daa(z); break; // daa
+  case 0x27: cyc += 4; daa(z); break; // daa
 
   case 0x2F:
+    cyc += 4;
     z->a = ~z->a;
     flag_set(z, nf, 1);
     flag_set(z, hf, 1);
@@ -1045,6 +1042,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
     break; // cpl
 
   case 0x37:
+    cyc += 4;
     flag_set(z, cf, 1);
     flag_set(z, nf, 0);
     flag_set(z, hf, 0);
@@ -1053,6 +1051,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
     break; // scf
 
   case 0x3F:
+    cyc += 4;
     flag_set(z, hf, flag_get(z, cf));
     flag_set(z, cf, !flag_get(z, cf));
     flag_set(z, nf, 0);
@@ -1060,7 +1059,8 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
     flag_set(z, yf, GET_BIT(5, z->a));
     break; // ccf
 
-  case 0x07: {
+  case 0x07:
+    cyc += 4; {
     flag_set(z, cf, z->a >> 7);
     z->a = (z->a << 1) | flag_get(z, cf);
     flag_set(z, nf, 0);
@@ -1070,6 +1070,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
   } break; // rlca (rotate left)
 
   case 0x0F: {
+    cyc += 4;
     flag_set(z, cf, z->a & 1);
     z->a = (z->a >> 1) | (flag_get(z, cf) << 7);
     flag_set(z, nf, 0);
@@ -1079,6 +1080,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
   } break; // rrca (rotate right)
 
   case 0x17: {
+    cyc += 4;
     const bool cy = flag_get(z, cf);
     flag_set(z, cf, z->a >> 7);
     z->a = (z->a << 1) | cy;
@@ -1089,6 +1091,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
   } break; // rla
 
   case 0x1F: {
+    cyc += 4;
     const bool cy = flag_get(z, cf);
     flag_set(z, cf, z->a & 1);
     z->a = (z->a >> 1) | (cy << 7);
@@ -1098,105 +1101,106 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
     flag_set(z, yf, GET_BIT(5, z->a));
   } break; // rra
 
-  case 0xA7: land(z, z->a); break; // and a
-  case 0xA0: land(z, z->b); break; // and b
-  case 0xA1: land(z, z->c); break; // and c
-  case 0xA2: land(z, z->d); break; // and d
-  case 0xA3: land(z, z->e); break; // and e
-  case 0xA4: land(z, z->h); break; // and h
-  case 0xA5: land(z, z->l); break; // and l
-  case 0xA6: land(z, rb(z, z->hl)); break; // and (hl)
-  case 0xE6: land(z, nextb(z)); break; // and *
+  case 0xA7: cyc += 4; land(z, z->a); break; // and a
+  case 0xA0: cyc += 4; land(z, z->b); break; // and b
+  case 0xA1: cyc += 4; land(z, z->c); break; // and c
+  case 0xA2: cyc += 4; land(z, z->d); break; // and d
+  case 0xA3: cyc += 4; land(z, z->e); break; // and e
+  case 0xA4: cyc += 4; land(z, z->h); break; // and h
+  case 0xA5: cyc += 4; land(z, z->l); break; // and l
+  case 0xA6: cyc += 7; land(z, rb(z, z->hl)); break; // and (hl)
+  case 0xE6: cyc += 7; land(z, nextb(z)); break; // and *
 
-  case 0xAF: lxor(z, z->a); break; // xor a
-  case 0xA8: lxor(z, z->b); break; // xor b
-  case 0xA9: lxor(z, z->c); break; // xor c
-  case 0xAA: lxor(z, z->d); break; // xor d
-  case 0xAB: lxor(z, z->e); break; // xor e
-  case 0xAC: lxor(z, z->h); break; // xor h
-  case 0xAD: lxor(z, z->l); break; // xor l
-  case 0xAE: lxor(z, rb(z, z->hl)); break; // xor (hl)
-  case 0xEE: lxor(z, nextb(z)); break; // xor *
+  case 0xAF: cyc += 4; lxor(z, z->a); break; // xor a
+  case 0xA8: cyc += 4; lxor(z, z->b); break; // xor b
+  case 0xA9: cyc += 4; lxor(z, z->c); break; // xor c
+  case 0xAA: cyc += 4; lxor(z, z->d); break; // xor d
+  case 0xAB: cyc += 4; lxor(z, z->e); break; // xor e
+  case 0xAC: cyc += 4; lxor(z, z->h); break; // xor h
+  case 0xAD: cyc += 4; lxor(z, z->l); break; // xor l
+  case 0xAE: cyc += 7; lxor(z, rb(z, z->hl)); break; // xor (hl)
+  case 0xEE: cyc += 7; lxor(z, nextb(z)); break; // xor *
 
-  case 0xB7: lor(z, z->a); break; // or a
-  case 0xB0: lor(z, z->b); break; // or b
-  case 0xB1: lor(z, z->c); break; // or c
-  case 0xB2: lor(z, z->d); break; // or d
-  case 0xB3: lor(z, z->e); break; // or e
-  case 0xB4: lor(z, z->h); break; // or h
-  case 0xB5: lor(z, z->l); break; // or l
-  case 0xB6: lor(z, rb(z, z->hl)); break; // or (hl)
-  case 0xF6: lor(z, nextb(z)); break; // or *
+  case 0xB7: cyc += 4; lor(z, z->a); break; // or a
+  case 0xB0: cyc += 4; lor(z, z->b); break; // or b
+  case 0xB1: cyc += 4; lor(z, z->c); break; // or c
+  case 0xB2: cyc += 4; lor(z, z->d); break; // or d
+  case 0xB3: cyc += 4; lor(z, z->e); break; // or e
+  case 0xB4: cyc += 4; lor(z, z->h); break; // or h
+  case 0xB5: cyc += 4; lor(z, z->l); break; // or l
+  case 0xB6: cyc += 7; lor(z, rb(z, z->hl)); break; // or (hl)
+  case 0xF6: cyc += 7; lor(z, nextb(z)); break; // or *
 
-  case 0xBF: cp(z, z->a); break; // cp a
-  case 0xB8: cp(z, z->b); break; // cp b
-  case 0xB9: cp(z, z->c); break; // cp c
-  case 0xBA: cp(z, z->d); break; // cp d
-  case 0xBB: cp(z, z->e); break; // cp e
-  case 0xBC: cp(z, z->h); break; // cp h
-  case 0xBD: cp(z, z->l); break; // cp l
-  case 0xBE: cp(z, rb(z, z->hl)); break; // cp (hl)
-  case 0xFE: cp(z, nextb(z)); break; // cp *
+  case 0xBF: cyc += 4; cp(z, z->a); break; // cp a
+  case 0xB8: cyc += 4; cp(z, z->b); break; // cp b
+  case 0xB9: cyc += 4; cp(z, z->c); break; // cp c
+  case 0xBA: cyc += 4; cp(z, z->d); break; // cp d
+  case 0xBB: cyc += 4; cp(z, z->e); break; // cp e
+  case 0xBC: cyc += 4; cp(z, z->h); break; // cp h
+  case 0xBD: cyc += 4; cp(z, z->l); break; // cp l
+  case 0xBE: cyc += 7; cp(z, rb(z, z->hl)); break; // cp (hl)
+  case 0xFE: cyc += 7; cp(z, nextb(z)); break; // cp *
 
-  case 0xC3: jump(z, nextw(z)); break; // jm **
-  case 0xC2: cond_jump(z, flag_get(z, zf) == 0); break; // jp nz, **
-  case 0xCA: cond_jump(z, flag_get(z, zf) == 1); break; // jp z, **
-  case 0xD2: cond_jump(z, flag_get(z, cf) == 0); break; // jp nc, **
-  case 0xDA: cond_jump(z, flag_get(z, cf) == 1); break; // jp c, **
-  case 0xE2: cond_jump(z, flag_get(z, pf) == 0); break; // jp po, **
-  case 0xEA: cond_jump(z, flag_get(z, pf) == 1); break; // jp pe, **
-  case 0xF2: cond_jump(z, flag_get(z, sf) == 0); break; // jp p, **
-  case 0xFA: cond_jump(z, flag_get(z, sf) == 1); break; // jp m, **
+  case 0xC3: cyc += 10; jump(z, nextw(z)); break; // jm **
+  case 0xC2: cyc += 10; cond_jump(z, flag_get(z, zf) == 0); break; // jp nz, **
+  case 0xCA: cyc += 10; cond_jump(z, flag_get(z, zf) == 1); break; // jp z, **
+  case 0xD2: cyc += 10; cond_jump(z, flag_get(z, cf) == 0); break; // jp nc, **
+  case 0xDA: cyc += 10; cond_jump(z, flag_get(z, cf) == 1); break; // jp c, **
+  case 0xE2: cyc += 10; cond_jump(z, flag_get(z, pf) == 0); break; // jp po, **
+  case 0xEA: cyc += 10; cond_jump(z, flag_get(z, pf) == 1); break; // jp pe, **
+  case 0xF2: cyc += 10; cond_jump(z, flag_get(z, sf) == 0); break; // jp p, **
+  case 0xFA: cyc += 10; cond_jump(z, flag_get(z, sf) == 1); break; // jp m, **
 
-  case 0x10: cyc += cond_jr(z, --z->b != 0); break; // djnz *
-  case 0x18: z->pc += (int8_t) nextb(z); break; // jr *
-  case 0x20: cyc += cond_jr(z, flag_get(z, zf) == 0); break; // jr nz, *
-  case 0x28: cyc += cond_jr(z, flag_get(z, zf) == 1); break; // jr z, *
-  case 0x30: cyc += cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
-  case 0x38: cyc += cond_jr(z, flag_get(z, cf) == 1); break; // jr c, *
+  case 0x10: cyc += 8; cyc += cond_jr(z, --z->b != 0); break; // djnz *
+  case 0x18: cyc += 12; z->pc += (int8_t) nextb(z); break; // jr *
+  case 0x20: cyc += 7; cyc += cond_jr(z, flag_get(z, zf) == 0); break; // jr nz, *
+  case 0x28: cyc += 7; cyc += cond_jr(z, flag_get(z, zf) == 1); break; // jr z, *
+  case 0x30: cyc += 7; cyc += cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
+  case 0x38: cyc += 7; cyc += cond_jr(z, flag_get(z, cf) == 1); break; // jr c, *
 
-  case 0xE9: z->pc = z->hl; break; // jp (hl)
-  case 0xCD: call(z, nextw(z)); break; // call
+  case 0xE9: cyc += 4; z->pc = z->hl; break; // jp (hl)
+  case 0xCD: cyc += 17; call(z, nextw(z)); break; // call
 
-  case 0xC4: cyc += cond_call(z, flag_get(z, zf) == 0); break; // cnz
-  case 0xCC: cyc += cond_call(z, flag_get(z, zf) == 1); break; // cz
-  case 0xD4: cyc += cond_call(z, flag_get(z, cf) == 0); break; // cnc
-  case 0xDC: cyc += cond_call(z, flag_get(z, cf) == 1); break; // cc
-  case 0xE4: cyc += cond_call(z, flag_get(z, pf) == 0); break; // cpo
-  case 0xEC: cyc += cond_call(z, flag_get(z, pf) == 1); break; // cpe
-  case 0xF4: cyc += cond_call(z, flag_get(z, sf) == 0); break; // cp
-  case 0xFC: cyc += cond_call(z, flag_get(z, sf) == 1); break; // cm
+  case 0xC4: cyc += 10; cyc += cond_call(z, flag_get(z, zf) == 0); break; // cnz
+  case 0xCC: cyc += 10; cyc += cond_call(z, flag_get(z, zf) == 1); break; // cz
+  case 0xD4: cyc += 10; cyc += cond_call(z, flag_get(z, cf) == 0); break; // cnc
+  case 0xDC: cyc += 10; cyc += cond_call(z, flag_get(z, cf) == 1); break; // cc
+  case 0xE4: cyc += 10; cyc += cond_call(z, flag_get(z, pf) == 0); break; // cpo
+  case 0xEC: cyc += 10; cyc += cond_call(z, flag_get(z, pf) == 1); break; // cpe
+  case 0xF4: cyc += 10; cyc += cond_call(z, flag_get(z, sf) == 0); break; // cp
+  case 0xFC: cyc += 10; cyc += cond_call(z, flag_get(z, sf) == 1); break; // cm
 
-  case 0xC9: ret(z); break; // ret
-  case 0xC0: cyc += cond_ret(z, flag_get(z, zf) == 0); break; // ret nz
-  case 0xC8: cyc += cond_ret(z, flag_get(z, zf) == 1); break; // ret z
-  case 0xD0: cyc += cond_ret(z, flag_get(z, cf) == 0); break; // ret nc
-  case 0xD8: cyc += cond_ret(z, flag_get(z, cf) == 1); break; // ret c
-  case 0xE0: cyc += cond_ret(z, flag_get(z, pf) == 0); break; // ret po
-  case 0xE8: cyc += cond_ret(z, flag_get(z, pf) == 1); break; // ret pe
-  case 0xF0: cyc += cond_ret(z, flag_get(z, sf) == 0); break; // ret p
-  case 0xF8: cyc += cond_ret(z, flag_get(z, sf) == 1); break; // ret m
+  case 0xC9: cyc += 10; ret(z); break; // ret
+  case 0xC0: cyc += 5; cyc += cond_ret(z, flag_get(z, zf) == 0); break; // ret nz
+  case 0xC8: cyc += 5; cyc += cond_ret(z, flag_get(z, zf) == 1); break; // ret z
+  case 0xD0: cyc += 5; cyc += cond_ret(z, flag_get(z, cf) == 0); break; // ret nc
+  case 0xD8: cyc += 5; cyc += cond_ret(z, flag_get(z, cf) == 1); break; // ret c
+  case 0xE0: cyc += 5; cyc += cond_ret(z, flag_get(z, pf) == 0); break; // ret po
+  case 0xE8: cyc += 5; cyc += cond_ret(z, flag_get(z, pf) == 1); break; // ret pe
+  case 0xF0: cyc += 5; cyc += cond_ret(z, flag_get(z, sf) == 0); break; // ret p
+  case 0xF8: cyc += 5; cyc += cond_ret(z, flag_get(z, sf) == 1); break; // ret m
 
-  case 0xC7: call(z, 0x00); break; // rst 0
-  case 0xCF: call(z, 0x08); break; // rst 1
-  case 0xD7: call(z, 0x10); break; // rst 2
-  case 0xDF: call(z, 0x18); break; // rst 3
-  case 0xE7: call(z, 0x20); break; // rst 4
-  case 0xEF: call(z, 0x28); break; // rst 5
-  case 0xF7: call(z, 0x30); break; // rst 6
-  case 0xFF: call(z, 0x38); break; // rst 7
+  case 0xC7: cyc += 11; call(z, 0x00); break; // rst 0
+  case 0xCF: cyc += 11; call(z, 0x08); break; // rst 1
+  case 0xD7: cyc += 11; call(z, 0x10); break; // rst 2
+  case 0xDF: cyc += 11; call(z, 0x18); break; // rst 3
+  case 0xE7: cyc += 11; call(z, 0x20); break; // rst 4
+  case 0xEF: cyc += 11; call(z, 0x28); break; // rst 5
+  case 0xF7: cyc += 11; call(z, 0x30); break; // rst 6
+  case 0xFF: cyc += 11; call(z, 0x38); break; // rst 7
 
-  case 0xC5: pushw(z, z->bc); break; // push bc
-  case 0xD5: pushw(z, z->de); break; // push de
-  case 0xE5: pushw(z, z->hl); break; // push hl
-  case 0xF5: pushw(z, z->af); break; // push af
+  case 0xC5: cyc += 11; pushw(z, z->bc); break; // push bc
+  case 0xD5: cyc += 11; pushw(z, z->de); break; // push de
+  case 0xE5: cyc += 11; pushw(z, z->hl); break; // push hl
+  case 0xF5: cyc += 11; pushw(z, z->af); break; // push af
 
-  case 0xC1: z->bc = popw(z); break; // pop bc
-  case 0xD1: z->de = popw(z); break; // pop de
-  case 0xE1: z->hl = popw(z); break; // pop hl
-  case 0xF1: z->af = popw(z); break; // pop af
+  case 0xC1: cyc += 10; z->bc = popw(z); break; // pop bc
+  case 0xD1: cyc += 10; z->de = popw(z); break; // pop de
+  case 0xE1: cyc += 10; z->hl = popw(z); break; // pop hl
+  case 0xF1: cyc += 10; z->af = popw(z); break; // pop af
 
   case 0xDB: {
+    cyc += 11;
     const uint8_t port = nextb(z);
     const uint8_t a = z->a;
     z->a = z->port_in(z, port);
@@ -1204,17 +1208,20 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
   } break; // in a,(n)
 
   case 0xD3: {
+    cyc += 11;
     const uint8_t port = nextb(z);
     z->port_out(z, port, z->a);
     z->mem_ptr = (port + 1) | (z->a << 8);
   } break; // out (n), a
 
   case 0x08: {
+    cyc += 4;
     uint16_t af = z->af;
     z->af = z->a_f_;
     z->a_f_ = af;
   } break; // ex af,af'
   case 0xD9: {
+    cyc += 4;
     uint16_t bc = z->bc, de = z->de, hl = z->hl;
 
     z->bc = z->b_c_;
@@ -1226,10 +1233,10 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
     z->h_l_ = hl;
   } break; // exx
 
-  case 0xCB: cyc += exec_opcode_cb(z, nextb(z)); break;
-  case 0xED: cyc += exec_opcode_ed(z, nextb(z)); break;
-  case 0xDD: cyc += exec_opcode_ddfd(z, nextb(z), &z->ix); break;
-  case 0xFD: cyc += exec_opcode_ddfd(z, nextb(z), &z->iy); break;
+  case 0xCB: cyc += 0; cyc += exec_opcode_cb(z, nextb(z)); break;
+  case 0xED: cyc += 0; cyc += exec_opcode_ed(z, nextb(z)); break;
+  case 0xDD: cyc += 0; cyc += exec_opcode_ddfd(z, nextb(z), &z->ix); break;
+  case 0xFD: cyc += 0; cyc += exec_opcode_ddfd(z, nextb(z), &z->iy); break;
 
   default: break; // fprintf(stderr, "unknown opcode %02X\n", opcode); break;
   }
