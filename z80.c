@@ -5,21 +5,6 @@
 #define Z80_WRITE_BYTE(U, A, V) z->write_byte(U, A, V)
 #endif
 
-// MARK: timings
-
-static const uint8_t cyc_ddfd[256] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4, 4, 4, 4, 14, 20, 10, 8, 8,
-    11, 4, 4, 15, 20, 10, 8, 8, 11, 4, 4, 4, 4, 4, 23, 23, 19, 4, 4, 15, 4, 4,
-    4, 4, 4, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4, 4, 8,
-    8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 8, 8, 8, 8, 8, 8, 19, 8, 8, 8, 8, 8, 8,
-    8, 19, 8, 19, 19, 19, 19, 19, 19, 4, 19, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4,
-    4, 8, 8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4,
-    4, 8, 8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4,
-    4, 8, 8, 19, 4, 4, 4, 4, 4, 8, 8, 19, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0,
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 14, 4, 23, 4,
-    15, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 10, 4, 4, 4, 4,
-    4, 4};
-
 enum z80_flagbit {
     cf = 0,
     nf = 1,
@@ -1233,7 +1218,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
 
 // executes a DD/FD opcode (IZ = IX or IY)
 static unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const iz) {
-  unsigned cyc = cyc_ddfd[opcode];
+  unsigned cyc = 0;
   inc_r(z);
 
 #define IZD displace(z, *iz, nextb(z))
@@ -1241,123 +1226,127 @@ static unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const i
 #define IZL (*iz & 0xFF)
 
   switch (opcode) {
-  case 0xE1: *iz = popw(z); break; // pop iz
-  case 0xE5: pushw(z, *iz); break; // push iz
+  case 0xE1: cyc += 14; *iz = popw(z); break; // pop iz
+  case 0xE5: cyc += 15; pushw(z, *iz); break; // push iz
 
-  case 0xE9: jump(z, *iz); break; // jp iz
+  case 0xE9: cyc += 8; jump(z, *iz); break; // jp iz
 
-  case 0x09: addiz(z, iz, z->bc); break; // add iz,bc
-  case 0x19: addiz(z, iz, z->de); break; // add iz,de
-  case 0x29: addiz(z, iz, *iz); break; // add iz,iz
-  case 0x39: addiz(z, iz, z->sp); break; // add iz,sp
+  case 0x09: cyc += 15; addiz(z, iz, z->bc); break; // add iz,bc
+  case 0x19: cyc += 15; addiz(z, iz, z->de); break; // add iz,de
+  case 0x29: cyc += 15; addiz(z, iz, *iz); break; // add iz,iz
+  case 0x39: cyc += 15; addiz(z, iz, z->sp); break; // add iz,sp
 
-  case 0x84: z->a = addb(z, z->a, IZH, 0); break; // add a,izh
-  case 0x85: z->a = addb(z, z->a, *iz & 0xFF, 0); break; // add a,izl
-  case 0x8C: z->a = addb(z, z->a, IZH, flag_get(z, cf)); break; // adc a,izh
-  case 0x8D: z->a = addb(z, z->a, *iz & 0xFF, flag_get(z, cf)); break; // adc a,izl
+  case 0x84: cyc += 8; z->a = addb(z, z->a, IZH, 0); break; // add a,izh
+  case 0x85: cyc += 8; z->a = addb(z, z->a, *iz & 0xFF, 0); break; // add a,izl
+  case 0x8C: cyc += 8; z->a = addb(z, z->a, IZH, flag_get(z, cf)); break; // adc a,izh
+  case 0x8D: cyc += 8; z->a = addb(z, z->a, *iz & 0xFF, flag_get(z, cf)); break; // adc a,izl
 
-  case 0x86: z->a = addb(z, z->a, rb(z, IZD), 0); break; // add a,(iz+*)
-  case 0x8E: z->a = addb(z, z->a, rb(z, IZD), flag_get(z, cf)); break; // adc a,(iz+*)
-  case 0x96: z->a = subb(z, z->a, rb(z, IZD), 0); break; // sub (iz+*)
-  case 0x9E: z->a = subb(z, z->a, rb(z, IZD), flag_get(z, cf)); break; // sbc (iz+*)
+  case 0x86: cyc += 19; z->a = addb(z, z->a, rb(z, IZD), 0); break; // add a,(iz+*)
+  case 0x8E: cyc += 19; z->a = addb(z, z->a, rb(z, IZD), flag_get(z, cf)); break; // adc a,(iz+*)
+  case 0x96: cyc += 19; z->a = subb(z, z->a, rb(z, IZD), 0); break; // sub (iz+*)
+  case 0x9E: cyc += 19; z->a = subb(z, z->a, rb(z, IZD), flag_get(z, cf)); break; // sbc (iz+*)
 
-  case 0x94: z->a = subb(z, z->a, IZH, 0); break; // sub izh
-  case 0x95: z->a = subb(z, z->a, *iz & 0xFF, 0); break; // sub izl
-  case 0x9C: z->a = subb(z, z->a, IZH, flag_get(z, cf)); break; // sbc izh
-  case 0x9D: z->a = subb(z, z->a, *iz & 0xFF, flag_get(z, cf)); break; // sbc izl
+  case 0x94: cyc += 8; z->a = subb(z, z->a, IZH, 0); break; // sub izh
+  case 0x95: cyc += 8; z->a = subb(z, z->a, *iz & 0xFF, 0); break; // sub izl
+  case 0x9C: cyc += 8; z->a = subb(z, z->a, IZH, flag_get(z, cf)); break; // sbc izh
+  case 0x9D: cyc += 8; z->a = subb(z, z->a, *iz & 0xFF, flag_get(z, cf)); break; // sbc izl
 
-  case 0xA6: land(z, rb(z, IZD)); break; // and (iz+*)
-  case 0xA4: land(z, IZH); break; // and izh
-  case 0xA5: land(z, *iz & 0xFF); break; // and izl
+  case 0xA6: cyc += 19; land(z, rb(z, IZD)); break; // and (iz+*)
+  case 0xA4: cyc += 8; land(z, IZH); break; // and izh
+  case 0xA5: cyc += 8; land(z, *iz & 0xFF); break; // and izl
 
-  case 0xAE: lxor(z, rb(z, IZD)); break; // xor (iz+*)
-  case 0xAC: lxor(z, IZH); break; // xor izh
-  case 0xAD: lxor(z, *iz & 0xFF); break; // xor izl
+  case 0xAE: cyc += 19; lxor(z, rb(z, IZD)); break; // xor (iz+*)
+  case 0xAC: cyc += 8; lxor(z, IZH); break; // xor izh
+  case 0xAD: cyc += 8; lxor(z, *iz & 0xFF); break; // xor izl
 
-  case 0xB6: lor(z, rb(z, IZD)); break; // or (iz+*)
-  case 0xB4: lor(z, IZH); break; // or izh
-  case 0xB5: lor(z, *iz & 0xFF); break; // or izl
+  case 0xB6: cyc += 19; lor(z, rb(z, IZD)); break; // or (iz+*)
+  case 0xB4: cyc += 8; lor(z, IZH); break; // or izh
+  case 0xB5: cyc += 8; lor(z, *iz & 0xFF); break; // or izl
 
-  case 0xBE: cp(z, rb(z, IZD)); break; // cp (iz+*)
-  case 0xBC: cp(z, IZH); break; // cp izh
-  case 0xBD: cp(z, *iz & 0xFF); break; // cp izl
+  case 0xBE: cyc += 19; cp(z, rb(z, IZD)); break; // cp (iz+*)
+  case 0xBC: cyc += 8; cp(z, IZH); break; // cp izh
+  case 0xBD: cyc += 8; cp(z, *iz & 0xFF); break; // cp izl
 
-  case 0x23: *iz += 1; break; // inc iz
-  case 0x2B: *iz -= 1; break; // dec iz
+  case 0x23: cyc += 10; *iz += 1; break; // inc iz
+  case 0x2B: cyc += 10; *iz -= 1; break; // dec iz
 
   case 0x34: {
+    cyc += 23;
     uint16_t addr = IZD;
     wb(z, addr, inc(z, rb(z, addr)));
   } break; // inc (iz+*)
 
   case 0x35: {
+    cyc += 23;
     uint16_t addr = IZD;
     wb(z, addr, dec(z, rb(z, addr)));
   } break; // dec (iz+*)
 
-  case 0x24: *iz = IZL | ((inc(z, IZH)) << 8); break; // inc izh
-  case 0x25: *iz = IZL | ((dec(z, IZH)) << 8); break; // dec izh
-  case 0x2C: *iz = (IZH << 8) | inc(z, IZL); break; // inc izl
-  case 0x2D: *iz = (IZH << 8) | dec(z, IZL); break; // dec izl
+  case 0x24: cyc += 8; *iz = IZL | ((inc(z, IZH)) << 8); break; // inc izh
+  case 0x25: cyc += 8; *iz = IZL | ((dec(z, IZH)) << 8); break; // dec izh
+  case 0x2C: cyc += 8; *iz = (IZH << 8) | inc(z, IZL); break; // inc izl
+  case 0x2D: cyc += 8; *iz = (IZH << 8) | dec(z, IZL); break; // dec izl
 
-  case 0x2A: *iz = rw(z, nextw(z)); break; // ld iz,(**)
-  case 0x22: ww(z, nextw(z), *iz); break; // ld (**),iz
-  case 0x21: *iz = nextw(z); break; // ld iz,**
+  case 0x2A: cyc += 20; *iz = rw(z, nextw(z)); break; // ld iz,(**)
+  case 0x22: cyc += 20; ww(z, nextw(z), *iz); break; // ld (**),iz
+  case 0x21: cyc += 14; *iz = nextw(z); break; // ld iz,**
 
   case 0x36: {
+    cyc += 19;
     uint16_t addr = IZD;
     wb(z, addr, nextb(z));
   } break; // ld (iz+*),*
 
-  case 0x70: wb(z, IZD, z->b); break; // ld (iz+*),b
-  case 0x71: wb(z, IZD, z->c); break; // ld (iz+*),c
-  case 0x72: wb(z, IZD, z->d); break; // ld (iz+*),d
-  case 0x73: wb(z, IZD, z->e); break; // ld (iz+*),e
-  case 0x74: wb(z, IZD, z->h); break; // ld (iz+*),h
-  case 0x75: wb(z, IZD, z->l); break; // ld (iz+*),l
-  case 0x77: wb(z, IZD, z->a); break; // ld (iz+*),a
+  case 0x70: cyc += 19; wb(z, IZD, z->b); break; // ld (iz+*),b
+  case 0x71: cyc += 19; wb(z, IZD, z->c); break; // ld (iz+*),c
+  case 0x72: cyc += 19; wb(z, IZD, z->d); break; // ld (iz+*),d
+  case 0x73: cyc += 19; wb(z, IZD, z->e); break; // ld (iz+*),e
+  case 0x74: cyc += 19; wb(z, IZD, z->h); break; // ld (iz+*),h
+  case 0x75: cyc += 19; wb(z, IZD, z->l); break; // ld (iz+*),l
+  case 0x77: cyc += 19; wb(z, IZD, z->a); break; // ld (iz+*),a
 
-  case 0x46: z->b = rb(z, IZD); break; // ld b,(iz+*)
-  case 0x4E: z->c = rb(z, IZD); break; // ld c,(iz+*)
-  case 0x56: z->d = rb(z, IZD); break; // ld d,(iz+*)
-  case 0x5E: z->e = rb(z, IZD); break; // ld e,(iz+*)
-  case 0x66: z->h = rb(z, IZD); break; // ld h,(iz+*)
-  case 0x6E: z->l = rb(z, IZD); break; // ld l,(iz+*)
-  case 0x7E: z->a = rb(z, IZD); break; // ld a,(iz+*)
+  case 0x46: cyc += 19; z->b = rb(z, IZD); break; // ld b,(iz+*)
+  case 0x4E: cyc += 19; z->c = rb(z, IZD); break; // ld c,(iz+*)
+  case 0x56: cyc += 19; z->d = rb(z, IZD); break; // ld d,(iz+*)
+  case 0x5E: cyc += 19; z->e = rb(z, IZD); break; // ld e,(iz+*)
+  case 0x66: cyc += 19; z->h = rb(z, IZD); break; // ld h,(iz+*)
+  case 0x6E: cyc += 19; z->l = rb(z, IZD); break; // ld l,(iz+*)
+  case 0x7E: cyc += 19; z->a = rb(z, IZD); break; // ld a,(iz+*)
 
-  case 0x44: z->b = IZH; break; // ld b,izh
-  case 0x4C: z->c = IZH; break; // ld c,izh
-  case 0x54: z->d = IZH; break; // ld d,izh
-  case 0x5C: z->e = IZH; break; // ld e,izh
-  case 0x7C: z->a = IZH; break; // ld a,izh
+  case 0x44: cyc += 8; z->b = IZH; break; // ld b,izh
+  case 0x4C: cyc += 8; z->c = IZH; break; // ld c,izh
+  case 0x54: cyc += 8; z->d = IZH; break; // ld d,izh
+  case 0x5C: cyc += 8; z->e = IZH; break; // ld e,izh
+  case 0x7C: cyc += 8; z->a = IZH; break; // ld a,izh
 
-  case 0x45: z->b = IZL; break; // ld b,izl
-  case 0x4D: z->c = IZL; break; // ld c,izl
-  case 0x55: z->d = IZL; break; // ld d,izl
-  case 0x5D: z->e = IZL; break; // ld e,izl
-  case 0x7D: z->a = IZL; break; // ld a,izl
+  case 0x45: cyc += 8; z->b = IZL; break; // ld b,izl
+  case 0x4D: cyc += 8; z->c = IZL; break; // ld c,izl
+  case 0x55: cyc += 8; z->d = IZL; break; // ld d,izl
+  case 0x5D: cyc += 8; z->e = IZL; break; // ld e,izl
+  case 0x7D: cyc += 8; z->a = IZL; break; // ld a,izl
 
-  case 0x60: *iz = IZL | (z->b << 8); break; // ld izh,b
-  case 0x61: *iz = IZL | (z->c << 8); break; // ld izh,c
-  case 0x62: *iz = IZL | (z->d << 8); break; // ld izh,d
-  case 0x63: *iz = IZL | (z->e << 8); break; // ld izh,e
-  case 0x64: break; // ld izh,izh
-  case 0x65: *iz = (IZL << 8) | IZL; break; // ld izh,izl
-  case 0x67: *iz = IZL | (z->a << 8); break; // ld izh,a
-  case 0x26: *iz = IZL | (nextb(z) << 8); break; // ld izh,*
+  case 0x60: cyc += 8; *iz = IZL | (z->b << 8); break; // ld izh,b
+  case 0x61: cyc += 8; *iz = IZL | (z->c << 8); break; // ld izh,c
+  case 0x62: cyc += 8; *iz = IZL | (z->d << 8); break; // ld izh,d
+  case 0x63: cyc += 8; *iz = IZL | (z->e << 8); break; // ld izh,e
+  case 0x64: cyc += 8; break; // ld izh,izh
+  case 0x65: cyc += 8; *iz = (IZL << 8) | IZL; break; // ld izh,izl
+  case 0x67: cyc += 8; *iz = IZL | (z->a << 8); break; // ld izh,a
+  case 0x26: cyc += 11; *iz = IZL | (nextb(z) << 8); break; // ld izh,*
 
-  case 0x68: *iz = (IZH << 8) | z->b; break; // ld izl,b
-  case 0x69: *iz = (IZH << 8) | z->c; break; // ld izl,c
-  case 0x6A: *iz = (IZH << 8) | z->d; break; // ld izl,d
-  case 0x6B: *iz = (IZH << 8) | z->e; break; // ld izl,e
-  case 0x6C: *iz = (IZH << 8) | IZH; break; // ld izl,izh
-  case 0x6D: break; // ld izl,izl
-  case 0x6F: *iz = (IZH << 8) | z->a; break; // ld izl,a
-  case 0x2E: *iz = (IZH << 8) | nextb(z); break; // ld izl,*
+  case 0x68: cyc += 8; *iz = (IZH << 8) | z->b; break; // ld izl,b
+  case 0x69: cyc += 8; *iz = (IZH << 8) | z->c; break; // ld izl,c
+  case 0x6A: cyc += 8; *iz = (IZH << 8) | z->d; break; // ld izl,d
+  case 0x6B: cyc += 8; *iz = (IZH << 8) | z->e; break; // ld izl,e
+  case 0x6C: cyc += 8; *iz = (IZH << 8) | IZH; break; // ld izl,izh
+  case 0x6D: cyc += 8; break; // ld izl,izl
+  case 0x6F: cyc += 8; *iz = (IZH << 8) | z->a; break; // ld izl,a
+  case 0x2E: cyc += 11; *iz = (IZH << 8) | nextb(z); break; // ld izl,*
 
-  case 0xF9: z->sp = *iz; break; // ld sp,iz
+  case 0xF9: cyc += 10; z->sp = *iz; break; // ld sp,iz
 
   case 0xE3: {
+    cyc += 23;
     const uint16_t val = rw(z, z->sp);
     ww(z, z->sp, *iz);
     *iz = val;
@@ -1372,7 +1361,7 @@ static unsigned exec_opcode_ddfd(z80* const z, uint8_t opcode, uint16_t* const i
 
   default: {
     // any other FD/DD opcode behaves as a non-prefixed opcode:
-    cyc += exec_opcode(z, opcode);
+    cyc += 4 + exec_opcode(z, opcode);
     // R should not be incremented twice:
     z->r = (z->r & 0x80) | ((z->r - 1) & 0x7f);
   } break;
