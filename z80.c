@@ -6,18 +6,6 @@
 #endif
 
 // MARK: timings
-static const uint8_t cyc_ed[256] = {8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 12,
-    12, 15, 20, 8, 14, 8, 9, 12, 12, 15, 20, 8, 14, 8, 9, 12, 12, 15, 20, 8, 14,
-    8, 9, 12, 12, 15, 20, 8, 14, 8, 9, 12, 12, 15, 20, 8, 14, 8, 18, 12, 12, 15,
-    20, 8, 14, 8, 18, 12, 12, 15, 20, 8, 14, 8, 8, 12, 12, 15, 20, 8, 14, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8,
-    16, 16, 16, 16, 8, 8, 8, 8, 16, 16, 16, 16, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-    8, 8, 8, 8, 8, 8, 8};
 
 static const uint8_t cyc_ddfd[256] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4,
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4, 4, 4, 4, 14, 20, 10, 8, 8,
@@ -1521,13 +1509,13 @@ static unsigned exec_opcode_dcb(z80* const z, uint8_t opcode, uint16_t addr) {
 
 // executes a ED opcode
 static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
-  unsigned cyc = cyc_ed[opcode];
+  unsigned cyc = 0;
   inc_r(z);
   switch (opcode) {
-  case 0x47: z->i = z->a; break; // ld i,a
-  case 0x4F: z->r = z->a; break; // ld r,a
+  case 0x47: cyc += 9; z->i = z->a; break; // ld i,a
+  case 0x4F: cyc += 9; z->r = z->a; break; // ld r,a
 
-  case 0x57:
+  case 0x57: cyc += 9;
     z->a = z->i;
     flag_set(z, sf, z->a >> 7);
     flag_set(z, zf, z->a == 0);
@@ -1536,7 +1524,7 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     flag_set(z, pf, z->iff2);
     break; // ld a,i
 
-  case 0x5F:
+  case 0x5F: cyc += 9;
     z->a = z->r;
     flag_set(z, sf, z->a >> 7);
     flag_set(z, zf, z->a == 0);
@@ -1552,13 +1540,15 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0x6D:
   case 0x75:
   case 0x7D:
+    cyc += 14;
     z->iff1 = z->iff2;
     ret(z);
     break; // retn
-  case 0x4D: ret(z); break; // reti
+  case 0x4D: cyc += 14; ret(z); break; // reti
 
-  case 0xA0: ldi(z); break; // ldi
+  case 0xA0: cyc += 16; ldi(z); break; // ldi
   case 0xB0: {
+    cyc += 16;
     ldi(z);
 
     if (z->bc != 0) {
@@ -1568,8 +1558,9 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
   } break; // ldir
 
-  case 0xA8: ldd(z); break; // ldd
+  case 0xA8: cyc += 16; ldd(z); break; // ldd
   case 0xB8: {
+    cyc += 16;
     ldd(z);
 
     if (z->bc != 0) {
@@ -1579,9 +1570,10 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
   } break; // lddr
 
-  case 0xA1: cpi(z); break; // cpi
-  case 0xA9: cpd(z); break; // cpd
+  case 0xA1: cyc += 16; cpi(z); break; // cpi
+  case 0xA9: cyc += 16; cpd(z); break; // cpd
   case 0xB1: {
+    cyc += 16;
     cpi(z);
     if (z->bc != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
@@ -1592,6 +1584,7 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
   } break; // cpir
   case 0xB9: {
+    cyc += 16;
     cpd(z);
     if (z->bc != 0 && !flag_get(z, zf)) {
       z->pc -= 2;
@@ -1601,31 +1594,35 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
   } break; // cpdr
 
-  case 0x40: in_r_c(z, &z->b); break; // in b, (c)
-  case 0x48: in_r_c(z, &z->c); break; // in c, (c)
-  case 0x50: in_r_c(z, &z->d); break; // in d, (c)
-  case 0x58: in_r_c(z, &z->e); break; // in e, (c)
-  case 0x60: in_r_c(z, &z->h); break; // in h, (c)
-  case 0x68: in_r_c(z, &z->l); break; // in l, (c)
+  case 0x40: cyc += 12; in_r_c(z, &z->b); break; // in b, (c)
+  case 0x48: cyc += 12; in_r_c(z, &z->c); break; // in c, (c)
+  case 0x50: cyc += 12; in_r_c(z, &z->d); break; // in d, (c)
+  case 0x58: cyc += 12; in_r_c(z, &z->e); break; // in e, (c)
+  case 0x60: cyc += 12; in_r_c(z, &z->h); break; // in h, (c)
+  case 0x68: cyc += 12; in_r_c(z, &z->l); break; // in l, (c)
   case 0x70: {
+    cyc += 12;
     uint8_t val;
     in_r_c(z, &val);
   } break; // in (c)
   case 0x78:
+    cyc += 12;
     in_r_c(z, &z->a);
     z->mem_ptr = z->bc + 1;
     break; // in a, (c)
 
-  case 0xA2: ini(z); break; // ini
+  case 0xA2: cyc += 16; ini(z); break; // ini
   case 0xB2:
+    cyc += 16;
     ini(z);
     if (z->b > 0) {
       z->pc -= 2;
       cyc += 5;
     }
     break; // inir
-  case 0xAA: ind(z); break; // ind
+  case 0xAA: cyc += 16; ind(z); break; // ind
   case 0xBA:
+    cyc += 16;
     ind(z);
     if (z->b > 0) {
       z->pc -= 2;
@@ -1633,28 +1630,31 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
     break; // indr
 
-  case 0x41: z->port_out(z, z->c, z->b); break; // out (c), b
-  case 0x49: z->port_out(z, z->c, z->c); break; // out (c), c
-  case 0x51: z->port_out(z, z->c, z->d); break; // out (c), d
-  case 0x59: z->port_out(z, z->c, z->e); break; // out (c), e
-  case 0x61: z->port_out(z, z->c, z->h); break; // out (c), h
-  case 0x69: z->port_out(z, z->c, z->l); break; // out (c), l
-  case 0x71: z->port_out(z, z->c, 0); break; // out (c), 0
+  case 0x41: cyc += 12; z->port_out(z, z->c, z->b); break; // out (c), b
+  case 0x49: cyc += 12; z->port_out(z, z->c, z->c); break; // out (c), c
+  case 0x51: cyc += 12; z->port_out(z, z->c, z->d); break; // out (c), d
+  case 0x59: cyc += 12; z->port_out(z, z->c, z->e); break; // out (c), e
+  case 0x61: cyc += 12; z->port_out(z, z->c, z->h); break; // out (c), h
+  case 0x69: cyc += 12; z->port_out(z, z->c, z->l); break; // out (c), l
+  case 0x71: cyc += 12; z->port_out(z, z->c, 0); break; // out (c), 0
   case 0x79:
+    cyc += 12;
     z->port_out(z, z->c, z->a);
     z->mem_ptr = z->bc + 1;
     break; // out (c), a
 
-  case 0xA3: outi(z); break; // outi
+  case 0xA3: cyc += 16; outi(z); break; // outi
   case 0xB3: {
+    cyc += 16;
     outi(z);
     if (z->b > 0) {
       z->pc -= 2;
       cyc += 5;
     }
   } break; // otir
-  case 0xAB: outd(z); break; // outd
+  case 0xAB: cyc += 16; outd(z); break; // outd
   case 0xBB: {
+    cyc += 16;
     outd(z);
     if (z->b > 0) {
       z->pc -= 2;
@@ -1662,59 +1662,67 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
   } break; // otdr
 
-  case 0x42: sbchl(z, z->bc); break; // sbc hl,bc
-  case 0x52: sbchl(z, z->de); break; // sbc hl,de
-  case 0x62: sbchl(z, z->hl); break; // sbc hl,hl
-  case 0x72: sbchl(z, z->sp); break; // sbc hl,sp
+  case 0x42: cyc += 15; sbchl(z, z->bc); break; // sbc hl,bc
+  case 0x52: cyc += 15; sbchl(z, z->de); break; // sbc hl,de
+  case 0x62: cyc += 15; sbchl(z, z->hl); break; // sbc hl,hl
+  case 0x72: cyc += 15; sbchl(z, z->sp); break; // sbc hl,sp
 
-  case 0x4A: adchl(z, z->bc); break; // adc hl,bc
-  case 0x5A: adchl(z, z->de); break; // adc hl,de
-  case 0x6A: adchl(z, z->hl); break; // adc hl,hl
-  case 0x7A: adchl(z, z->sp); break; // adc hl,sp
+  case 0x4A: cyc += 15; adchl(z, z->bc); break; // adc hl,bc
+  case 0x5A: cyc += 15; adchl(z, z->de); break; // adc hl,de
+  case 0x6A: cyc += 15; adchl(z, z->hl); break; // adc hl,hl
+  case 0x7A: cyc += 15; adchl(z, z->sp); break; // adc hl,sp
 
   case 0x43: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     ww(z, addr, z->bc);
     z->mem_ptr = addr + 1;
   } break; // ld (**), bc
 
   case 0x53: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     ww(z, addr, z->de);
     z->mem_ptr = addr + 1;
   } break; // ld (**), de
 
   case 0x63: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     ww(z, addr, z->hl);
     z->mem_ptr = addr + 1;
   } break; // ld (**), hl
 
   case 0x73: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     ww(z, addr, z->sp);
     z->mem_ptr = addr + 1;
   } break; // ld (**),sp
 
   case 0x4B: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     z->bc = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld bc, (**)
 
   case 0x5B: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     z->de = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld de, (**)
 
   case 0x6B: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     z->hl = rw(z, addr);
     z->mem_ptr = addr + 1;
   } break; // ld hl, (**)
 
   case 0x7B: {
+    cyc += 20;
     const uint16_t addr = nextw(z);
     z->sp = rw(z, addr);
     z->mem_ptr = addr + 1;
@@ -1727,16 +1735,17 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0x4C:
   case 0x5C:
   case 0x6C:
-  case 0x7C: z->a = subb(z, 0, z->a, 0); break; // neg
+  case 0x7C: cyc += 8; z->a = subb(z, 0, z->a, 0); break; // neg
 
   case 0x46:
-  case 0x66: z->interrupt_mode = 0; break; // im 0
+  case 0x66: cyc += 8; z->interrupt_mode = 0; break; // im 0
   case 0x56:
-  case 0x76: z->interrupt_mode = 1; break; // im 1
+  case 0x76: cyc += 8; z->interrupt_mode = 1; break; // im 1
   case 0x5E:
-  case 0x7E: z->interrupt_mode = 2; break; // im 2
+  case 0x7E: cyc += 8; z->interrupt_mode = 2; break; // im 2
 
   case 0x67: {
+    cyc += 18;
     uint8_t a = z->a;
     uint8_t val = rb(z, z->hl);
     z->a = (a & 0xF0) | (val & 0xF);
@@ -1754,6 +1763,7 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
   } break; // rrd
 
   case 0x6F: {
+    cyc += 18;
     uint8_t a = z->a;
     uint8_t val = rb(z, z->hl);
     z->a = (a & 0xF0) | (val >> 4);
