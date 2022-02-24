@@ -1,5 +1,10 @@
 #include "z80.h"
 
+#ifndef Z80_READ_BYTE
+#define Z80_READ_BYTE(U, A) z->read_byte(U, A)
+#define Z80_WRITE_BYTE(U, A, V) z->write_byte(U, A, V)
+#endif
+
 // MARK: timings
 static const uint8_t cyc_00[256] = {4, 10, 7, 6, 4, 4, 7, 4, 4, 11, 7, 6, 4, 4,
     7, 4, 8, 10, 7, 6, 4, 4, 7, 4, 12, 11, 7, 6, 4, 4, 7, 4, 7, 10, 16, 6, 4, 4,
@@ -71,21 +76,21 @@ static inline void flag_set(z80* const z, enum z80_flagbit bit, bool val) {
 }
 
 static inline uint8_t rb(z80* const z, uint16_t addr) {
-  return z->read_byte(z->userdata, addr);
+  return Z80_READ_BYTE(z->userdata, addr);
 }
 
 static inline void wb(z80* const z, uint16_t addr, uint8_t val) {
-  z->write_byte(z->userdata, addr, val);
+  Z80_WRITE_BYTE(z->userdata, addr, val);
 }
 
 static inline uint16_t rw(z80* const z, uint16_t addr) {
-  return (z->read_byte(z->userdata, addr + 1) << 8) |
-         z->read_byte(z->userdata, addr);
+  return (Z80_READ_BYTE(z->userdata, addr + 1) << 8) |
+         Z80_READ_BYTE(z->userdata, addr);
 }
 
 static inline void ww(z80* const z, uint16_t addr, uint16_t val) {
-  z->write_byte(z->userdata, addr, val & 0xFF);
-  z->write_byte(z->userdata, addr + 1, val >> 8);
+  Z80_WRITE_BYTE(z->userdata, addr, val & 0xFF);
+  Z80_WRITE_BYTE(z->userdata, addr + 1, val >> 8);
 }
 
 static inline void pushw(z80* const z, uint16_t val) {
