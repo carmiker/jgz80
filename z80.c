@@ -16,6 +16,24 @@ enum z80_flagbit {
     sf = 7
 };
 
+static const uint8_t f_szpxy[] = {
+    0x44, 0x00, 0x00, 0x04, 0x00, 0x04, 0x04, 0x00, 0x08, 0x0c, 0x0c, 0x08, 0x0c, 0x08, 0x08, 0x0c,
+    0x00, 0x04, 0x04, 0x00, 0x04, 0x00, 0x00, 0x04, 0x0c, 0x08, 0x08, 0x0c, 0x08, 0x0c, 0x0c, 0x08,
+    0x20, 0x24, 0x24, 0x20, 0x24, 0x20, 0x20, 0x24, 0x2c, 0x28, 0x28, 0x2c, 0x28, 0x2c, 0x2c, 0x28,
+    0x24, 0x20, 0x20, 0x24, 0x20, 0x24, 0x24, 0x20, 0x28, 0x2c, 0x2c, 0x28, 0x2c, 0x28, 0x28, 0x2c,
+    0x00, 0x04, 0x04, 0x00, 0x04, 0x00, 0x00, 0x04, 0x0c, 0x08, 0x08, 0x0c, 0x08, 0x0c, 0x0c, 0x08,
+    0x04, 0x00, 0x00, 0x04, 0x00, 0x04, 0x04, 0x00, 0x08, 0x0c, 0x0c, 0x08, 0x0c, 0x08, 0x08, 0x0c,
+    0x24, 0x20, 0x20, 0x24, 0x20, 0x24, 0x24, 0x20, 0x28, 0x2c, 0x2c, 0x28, 0x2c, 0x28, 0x28, 0x2c,
+    0x20, 0x24, 0x24, 0x20, 0x24, 0x20, 0x20, 0x24, 0x2c, 0x28, 0x28, 0x2c, 0x28, 0x2c, 0x2c, 0x28,
+    0x80, 0x84, 0x84, 0x80, 0x84, 0x80, 0x80, 0x84, 0x8c, 0x88, 0x88, 0x8c, 0x88, 0x8c, 0x8c, 0x88,
+    0x84, 0x80, 0x80, 0x84, 0x80, 0x84, 0x84, 0x80, 0x88, 0x8c, 0x8c, 0x88, 0x8c, 0x88, 0x88, 0x8c,
+    0xa4, 0xa0, 0xa0, 0xa4, 0xa0, 0xa4, 0xa4, 0xa0, 0xa8, 0xac, 0xac, 0xa8, 0xac, 0xa8, 0xa8, 0xac,
+    0xa0, 0xa4, 0xa4, 0xa0, 0xa4, 0xa0, 0xa0, 0xa4, 0xac, 0xa8, 0xa8, 0xac, 0xa8, 0xac, 0xac, 0xa8,
+    0x84, 0x80, 0x80, 0x84, 0x80, 0x84, 0x84, 0x80, 0x88, 0x8c, 0x8c, 0x88, 0x8c, 0x88, 0x88, 0x8c,
+    0x80, 0x84, 0x84, 0x80, 0x84, 0x80, 0x80, 0x84, 0x8c, 0x88, 0x88, 0x8c, 0x88, 0x8c, 0x8c, 0x88,
+    0xa0, 0xa4, 0xa4, 0xa0, 0xa4, 0xa0, 0xa0, 0xa4, 0xac, 0xa8, 0xa8, 0xac, 0xa8, 0xac, 0xac, 0xa8,
+    0xa4, 0xa0, 0xa0, 0xa4, 0xa0, 0xa4, 0xa4, 0xa0, 0xa8, 0xac, 0xac, 0xa8, 0xac, 0xa8, 0xa8, 0xac,
+};
 
 // MARK: helpers
 
@@ -271,15 +289,10 @@ static inline uint8_t dec(z80* const z, uint8_t a) {
 // result in register A
 static inline void land(z80* const z, uint8_t val) {
   const uint8_t result = z->a & val;
-  z->f = 0 |
-    flag_val(sf, result >> 7) |
-    flag_val(zf, result == 0) |
+  z->f = f_szpxy[result] |
     flag_val(hf,  1) |
-    flag_val(pf, parity(result)) |
     flag_val(nf, 0) |
-    flag_val(cf, 0) |
-    flag_val(xf, GET_BIT(3, result)) |
-    flag_val(yf, GET_BIT(5, result));
+    flag_val(cf, 0);
   z->a = result;
 }
 
@@ -287,15 +300,10 @@ static inline void land(z80* const z, uint8_t val) {
 // result in register A
 static inline void lxor(z80* const z, const uint8_t val) {
   const uint8_t result = z->a ^ val;
-  z->f = 0 |
-    flag_val(sf, result >> 7) |
-    flag_val(zf, result == 0) |
+  z->f = f_szpxy[result] |
     flag_val(hf, 0) |
-    flag_val(pf, parity(result)) |
     flag_val(nf, 0) |
-    flag_val(cf, 0) |
-    flag_val(xf, GET_BIT(3, result)) |
-    flag_val(yf, GET_BIT(5, result));
+    flag_val(cf, 0);
   z->a = result;
 }
 
@@ -303,15 +311,10 @@ static inline void lxor(z80* const z, const uint8_t val) {
 // result in register A
 static inline void lor(z80* const z, const uint8_t val) {
   const uint8_t result = z->a | val;
-  z->f = 0 |
-    flag_val(sf, result >> 7) |
-    flag_val(zf, result == 0) |
+  z->f = f_szpxy[result] |
     flag_val(hf, 0) |
-    flag_val(pf, parity(result)) |
     flag_val(nf, 0) |
-    flag_val(cf, 0) |
-    flag_val(xf, GET_BIT(3, result)) |
-    flag_val(yf, GET_BIT(5, result));
+    flag_val(cf, 0);
   z->a = result;
 }
 
@@ -331,15 +334,10 @@ static inline void cp(z80* const z, const uint8_t val) {
 static inline uint8_t cb_rlc(z80* const z, uint8_t val) {
   const bool old = val >> 7;
   val = (val << 1) | old;
-  z->f = 0 |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
-    flag_val(pf, parity(val)) |
+  z->f = f_szpxy[val] |
     flag_val(nf, 0) |
     flag_val(hf, 0) |
-    flag_val(cf, old) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(cf, old);
   return val;
 }
 
@@ -347,15 +345,10 @@ static inline uint8_t cb_rlc(z80* const z, uint8_t val) {
 static inline uint8_t cb_rrc(z80* const z, uint8_t val) {
   const bool old = val & 1;
   val = (val >> 1) | (old << 7);
-  z->f = 0 |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
+  z->f = f_szpxy[val] |
     flag_val(nf, 0) |
     flag_val(hf, 0) |
-    flag_val(cf, old) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(cf, old);
   return val;
 }
 
@@ -364,15 +357,10 @@ static inline uint8_t cb_rl(z80* const z, uint8_t val) {
   const bool cfc = flag_get(z, cf);
   const bool cfn = val >> 7;
   val = (val << 1) | cfc;
-  z->f = 0 |
+  z->f = f_szpxy[val] |
     flag_val(cf, cfn) |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
     flag_val(nf, 0) |
-    flag_val(hf, 0) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(hf, 0);
   return val;
 }
 
@@ -381,15 +369,10 @@ static inline uint8_t cb_rr(z80* const z, uint8_t val) {
   const bool c = flag_get(z, cf);
   const bool cfn = val & 1;
   val = (val >> 1) | (c << 7);
-  z->f = 0 |
+  z->f = f_szpxy[val] |
     flag_val(cf, cfn) |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
     flag_val(nf, 0) |
-    flag_val(hf, 0) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(hf, 0);
   return val;
 }
 
@@ -397,15 +380,10 @@ static inline uint8_t cb_rr(z80* const z, uint8_t val) {
 static inline uint8_t cb_sla(z80* const z, uint8_t val) {
   const bool cfn = val >> 7;
   val <<= 1;
-  z->f = 0 |
+  z->f = f_szpxy[val] |
     flag_val(cf, cfn) |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
     flag_val(nf, 0) |
-    flag_val(hf, 0) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(hf, 0);
   return val;
 }
 
@@ -414,15 +392,10 @@ static inline uint8_t cb_sll(z80* const z, uint8_t val) {
   const bool cfn = val >> 7;
   val <<= 1;
   val |= 1;
-  z->f = 0 |
+  z->f = f_szpxy[val] |
     flag_val(cf, cfn) |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
     flag_val(nf, 0) |
-    flag_val(hf, 0) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(hf, 0);
   return val;
 }
 
@@ -430,15 +403,10 @@ static inline uint8_t cb_sll(z80* const z, uint8_t val) {
 static inline uint8_t cb_sra(z80* const z, uint8_t val) {
   const bool cfn = val & 1;
   val = (val >> 1) | (val & 0x80); // 0b10000000
-  z->f = 0 |
+  z->f = f_szpxy[val] |
     flag_val(cf, cfn) |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
     flag_val(nf, 0) |
-    flag_val(hf, 0) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(hf, 0);
   return val;
 }
 
@@ -446,29 +414,21 @@ static inline uint8_t cb_sra(z80* const z, uint8_t val) {
 static inline uint8_t cb_srl(z80* const z, uint8_t val) {
   const bool cfn = val & 1;
   val >>= 1;
-  z->f = 0 |
+  z->f = f_szpxy[val] |
     flag_val(cf, cfn) |
-    flag_val(sf, val >> 7) |
-    flag_val(zf, val == 0) |
     flag_val(nf, 0) |
-    flag_val(hf, 0) |
-    flag_val(pf, parity(val)) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(yf, GET_BIT(5, val));
+    flag_val(hf, 0);
   return val;
 }
 
 // tests bit "n" from a byte
 static inline uint8_t cb_bit(z80* const z, uint8_t val, uint8_t n) {
   const uint8_t result = val & (1 << n);
-  z->f = 0 |
+  z->f = f_szpxy[result] |
     flag_val(cf, flag_get(z, cf)) | /* original code didn't set this one, so use old value */
-    flag_val(sf, result >> 7) |
-    flag_val(zf, result == 0) |
     flag_val(yf, GET_BIT(5, val)) |
     flag_val(hf, 1) |
     flag_val(xf, GET_BIT(3, val)) |
-    flag_val(pf, result == 0) |
     flag_val(nf, 0);
   return result;
 }
@@ -524,6 +484,8 @@ static inline void cpd(z80* const z) {
 
 static void in_r_c(z80* const z, uint8_t* r) {
   *r = z->port_in(z, z->c);
+  // FIXME: according to z80 wiki this one should set x/y flags too,
+  // in which case we should be able to use f_szpxy.
   flag_set(z, zf, *r == 0);
   flag_set(z, sf, *r >> 7);
   flag_set(z, pf, parity(*r));
@@ -590,12 +552,8 @@ static void daa(z80* const z) {
     flag_set(z, hf, (z->a & 0x0F) > 0x09);
     z->a += correction;
   }
-
-  flag_set(z, sf, z->a >> 7);
-  flag_set(z, zf, z->a == 0);
-  flag_set(z, pf, parity(z->a));
-  flag_set(z, xf, GET_BIT(3, z->a));
-  flag_set(z, yf, GET_BIT(5, z->a));
+  z->f &= ~((1 << sf) | (1 << zf) | (1 << pf) | (1 << xf) | (1 << yf));
+  z->f |= f_szpxy[z->a];
 }
 
 static inline uint16_t displace(
@@ -1739,15 +1697,10 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     uint8_t val = rb(z, z->hl);
     z->a = (a & 0xF0) | (val & 0xF);
     wb(z, z->hl, (val >> 4) | (a << 4));
-    z->f = 0 |
+    z->f = f_szpxy[z->a] |
       flag_val(cf, flag_get(z, cf)) | /* cf unmodified */
       flag_val(nf, 0) |
-      flag_val(hf, 0) |
-      flag_val(xf, GET_BIT(3, z->a)) |
-      flag_val(yf, GET_BIT(5, z->a)) |
-      flag_val(zf, z->a == 0) |
-      flag_val(sf, z->a >> 7) |
-      flag_val(pf, parity(z->a));
+      flag_val(hf, 0);
     z->mem_ptr = z->hl + 1;
   } break; // rrd
 
@@ -1758,15 +1711,10 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     z->a = (a & 0xF0) | (val >> 4);
     wb(z, z->hl, (val << 4) | (a & 0xF));
 
-    z->f = 0 |
+    z->f = f_szpxy[z->a] |
       flag_val(cf, flag_get(z, cf)) | /* cf unmodified */
       flag_val(nf, 0) |
-      flag_val(hf, 0) |
-      flag_val(xf, GET_BIT(3, z->a)) |
-      flag_val(yf, GET_BIT(5, z->a)) |
-      flag_val(zf, z->a == 0) |
-      flag_val(sf, z->a >> 7) |
-      flag_val(pf, parity(z->a));
+      flag_val(hf, 0);
     z->mem_ptr = z->hl + 1;
   } break; // rld
 
