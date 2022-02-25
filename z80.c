@@ -483,7 +483,7 @@ static inline void cpd(z80* const z) {
 }
 
 static void in_r_c(z80* const z, uint8_t* r) {
-  *r = z->port_in(z, z->c);
+  *r = z->port_in(z, z->bc);
   // FIXME: according to z80 wiki this one should set x/y flags too,
   // in which case we should be able to use f_szpxy.
   flag_set(z, zf, *r == 0);
@@ -494,7 +494,7 @@ static void in_r_c(z80* const z, uint8_t* r) {
 }
 
 static void ini(z80* const z) {
-  uint8_t val = z->port_in(z, z->c);
+  uint8_t val = z->port_in(z, z->bc);
   wb(z, z->hl, val);
   ++z->hl;
   z->b -= 1;
@@ -510,7 +510,7 @@ static void ind(z80* const z) {
 }
 
 static void outi(z80* const z) {
-  z->port_out(z, z->c, rb(z, z->hl));
+  z->port_out(z, z->bc, rb(z, z->hl));
   ++z->hl;
   z->b -= 1;
   flag_set(z, zf, z->b == 0);
@@ -1132,7 +1132,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
 
   case 0xDB: {
     cyc += 11;
-    const uint8_t port = nextb(z);
+    const uint16_t port = nextb(z) | (z->a << 8);
     const uint8_t a = z->a;
     z->a = z->port_in(z, port);
     z->mem_ptr = (a << 8) | (z->a + 1);
@@ -1140,7 +1140,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
 
   case 0xD3: {
     cyc += 11;
-    const uint8_t port = nextb(z);
+    const uint16_t port = nextb(z) | (z->a << 8);
     z->port_out(z, port, z->a);
     z->mem_ptr = (port + 1) | (z->a << 8);
   } break; // out (n), a
@@ -1577,16 +1577,16 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
     break; // indr
 
-  case 0x41: cyc += 12; z->port_out(z, z->c, z->b); break; // out (c), b
-  case 0x49: cyc += 12; z->port_out(z, z->c, z->c); break; // out (c), c
-  case 0x51: cyc += 12; z->port_out(z, z->c, z->d); break; // out (c), d
-  case 0x59: cyc += 12; z->port_out(z, z->c, z->e); break; // out (c), e
-  case 0x61: cyc += 12; z->port_out(z, z->c, z->h); break; // out (c), h
-  case 0x69: cyc += 12; z->port_out(z, z->c, z->l); break; // out (c), l
-  case 0x71: cyc += 12; z->port_out(z, z->c, 0); break; // out (c), 0
+  case 0x41: cyc += 12; z->port_out(z, z->bc, z->b); break; // out (c), b
+  case 0x49: cyc += 12; z->port_out(z, z->bc, z->c); break; // out (c), c
+  case 0x51: cyc += 12; z->port_out(z, z->bc, z->d); break; // out (c), d
+  case 0x59: cyc += 12; z->port_out(z, z->bc, z->e); break; // out (c), e
+  case 0x61: cyc += 12; z->port_out(z, z->bc, z->h); break; // out (c), h
+  case 0x69: cyc += 12; z->port_out(z, z->bc, z->l); break; // out (c), l
+  case 0x71: cyc += 12; z->port_out(z, z->bc, 0); break; // out (c), 0
   case 0x79:
     cyc += 12;
-    z->port_out(z, z->c, z->a);
+    z->port_out(z, z->bc, z->a);
     z->mem_ptr = z->bc + 1;
     break; // out (c), a
 
