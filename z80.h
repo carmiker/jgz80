@@ -47,6 +47,7 @@ struct z80 {
 };
 
 Z80_EXPORT void z80_init(z80* const z);
+Z80_EXPORT void z80_reset(z80* const z);
 Z80_EXPORT unsigned z80_step(z80* const z); /* return cycles used */
 Z80_EXPORT unsigned z80_step_n(z80* const z, unsigned cycles);
 Z80_EXPORT void z80_debug_output(z80* const z);

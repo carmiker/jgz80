@@ -661,6 +661,21 @@ Z80_EXPORT void z80_init(z80* const z) {
   z->int_data = 0;
 }
 
+Z80_EXPORT void z80_reset(z80* const z) {
+  z->pc = 0;
+  z->mem_ptr = 0;
+
+  z->i = 0;
+  z->r = 0;
+
+  z->interrupt_mode = 0;
+  z->iff_delay = 0;
+  z->iff1 = 0;
+  z->iff2 = 0;
+  z->halted = 0;
+  z->nmi_pending = 0;
+}
+
 static unsigned z80_step_s(z80* const z) {
   unsigned cyc = 0;
   if (z->halted) {
