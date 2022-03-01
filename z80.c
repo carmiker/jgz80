@@ -730,17 +730,466 @@ Z80_EXPORT unsigned z80_step_n(z80* const z, unsigned cycles) {
   return cyc;
 }
 
+#ifdef Z80_DEBUG
+static inline uint8_t getpcb(z80* const z, unsigned offset) {
+  return rb(z, z->pc+offset);
+}
+static inline uint16_t getpcw(z80* const z, unsigned offset) {
+  return rw(z, z->pc+offset);
+}
+
+static char* z80_disas_ddfd(z80* const z) {
+  uint8_t opcode = getpcb(z, 1);
+  switch (opcode) {
+  case 0xE1: return "pop iz";
+  case 0xE5: return "push iz";
+
+  case 0xE9: return "jp iz";
+
+  case 0x09: return "add iz,bc";
+  case 0x19: return "add iz,de";
+  case 0x29: return "add iz,iz";
+  case 0x39: return "add iz,sp";
+
+  case 0x84: return "add a,izh";
+  case 0x85: return "add a,izl";
+  case 0x8C: return "adc a,izh";
+  case 0x8D: return "adc a,izl";
+
+  case 0x86: return "add a,(iz+*)";
+  case 0x8E: return "adc a,(iz+*)";
+  case 0x96: return "sub (iz+*)";
+  case 0x9E: return "sbc (iz+*)";
+
+  case 0x94: return "sub izh";
+  case 0x95: return "sub izl";
+  case 0x9C: return "sbc izh";
+  case 0x9D: return "sbc izl";
+
+  case 0xA6: return "and (iz+*)";
+  case 0xA4: return "and izh";
+  case 0xA5: return "and izl";
+
+  case 0xAE: return "xor (iz+*)";
+  case 0xAC: return "xor izh";
+  case 0xAD: return "xor izl";
+
+  case 0xB6: return "or (iz+*)";
+  case 0xB4: return "or izh";
+  case 0xB5: return "or izl";
+
+  case 0xBE: return "cp (iz+*)";
+  case 0xBC: return "cp izh";
+  case 0xBD: return "cp izl";
+
+  case 0x23: return "inc iz";
+  case 0x2B: return "dec iz";
+
+  case 0x34: return "inc (iz+*)";
+
+  case 0x35: return "dec (iz+*)";
+
+  case 0x24: return "inc izh";
+  case 0x25: return "dec izh";
+  case 0x2C: return "inc izl";
+  case 0x2D: return "dec izl";
+
+  case 0x2A: return "ld iz,(**)";
+  case 0x22: return "ld (**),iz";
+  case 0x21: return "ld iz,**";
+
+  case 0x36: return "ld (iz+*),*";
+
+  case 0x70: return "ld (iz+*),b";
+  case 0x71: return "ld (iz+*),c";
+  case 0x72: return "ld (iz+*),d";
+  case 0x73: return "ld (iz+*),e";
+  case 0x74: return "ld (iz+*),h";
+  case 0x75: return "ld (iz+*),l";
+  case 0x77: return "ld (iz+*),a";
+
+  case 0x46: return "ld b,(iz+*)";
+  case 0x4E: return "ld c,(iz+*)";
+  case 0x56: return "ld d,(iz+*)";
+  case 0x5E: return "ld e,(iz+*)";
+  case 0x66: return "ld h,(iz+*)";
+  case 0x6E: return "ld l,(iz+*)";
+  case 0x7E: return "ld a,(iz+*)";
+
+  case 0x44: return "ld b,izh";
+  case 0x4C: return "ld c,izh";
+  case 0x54: return "ld d,izh";
+  case 0x5C: return "ld e,izh";
+  case 0x7C: return "ld a,izh";
+
+  case 0x45: return "ld b,izl";
+  case 0x4D: return "ld c,izl";
+  case 0x55: return "ld d,izl";
+  case 0x5D: return "ld e,izl";
+  case 0x7D: return "ld a,izl";
+
+  case 0x60: return "ld izh,b";
+  case 0x61: return "ld izh,c";
+  case 0x62: return "ld izh,d";
+  case 0x63: return "ld izh,e";
+  case 0x64: return "ld izh,izh";
+  case 0x65: return "ld izh,izl";
+  case 0x67: return "ld izh,a";
+  case 0x26: return "ld izh,*";
+
+  case 0x68: return "ld izl,b";
+  case 0x69: return "ld izl,c";
+  case 0x6A: return "ld izl,d";
+  case 0x6B: return "ld izl,e";
+  case 0x6C: return "ld izl,izh";
+  case 0x6D: return "ld izl,izl";
+  case 0x6F: return "ld izl,a";
+  case 0x2E: return "ld izl,*";
+
+  case 0xF9: return "ld sp,iz";
+
+  case 0xE3: return "ex (sp),iz";
+
+  case 0xCB: return "DCBxx"; // FIXME: return what opcode_dcb does
+  }
+  return "redirect to normal opcode"; // FIXME: this should print regular opcode instead
+}
+
+static char* z80_disas(z80* const z) {
+  static char buf[32];
+  uint8_t opcode = getpcb(z, 0);
+  switch (opcode) {
+  case 0x7F: return "ld a,a";
+  case 0x78: return "ld a,b";
+  case 0x79: return "ld a,c";
+  case 0x7A: return "ld a,d";
+  case 0x7B: return "ld a,e";
+  case 0x7C: return "ld a,h";
+  case 0x7D: return "ld a,l";
+
+  case 0x47: return "ld b,a";
+  case 0x40: return "ld b,b";
+  case 0x41: return "ld b,c";
+  case 0x42: return "ld b,d";
+  case 0x43: return "ld b,e";
+  case 0x44: return "ld b,h";
+  case 0x45: return "ld b,l";
+
+  case 0x4F: return "ld c,a";
+  case 0x48: return "ld c,b";
+  case 0x49: return "ld c,c";
+  case 0x4A: return "ld c,d";
+  case 0x4B: return "ld c,e";
+  case 0x4C: return "ld c,h";
+  case 0x4D: return "ld c,l";
+
+  case 0x57: return "ld d,a";
+  case 0x50: return "ld d,b";
+  case 0x51: return "ld d,c";
+  case 0x52: return "ld d,d";
+  case 0x53: return "ld d,e";
+  case 0x54: return "ld d,h";
+  case 0x55: return "ld d,l";
+
+  case 0x5F: return "ld e,a";
+  case 0x58: return "ld e,b";
+  case 0x59: return "ld e,c";
+  case 0x5A: return "ld e,d";
+  case 0x5B: return "ld e,e";
+  case 0x5C: return "ld e,h";
+  case 0x5D: return "ld e,l";
+
+  case 0x67: return "ld h,a";
+  case 0x60: return "ld h,b";
+  case 0x61: return "ld h,c";
+  case 0x62: return "ld h,d";
+  case 0x63: return "ld h,e";
+  case 0x64: return "ld h,h";
+  case 0x65: return "ld h,l";
+
+  case 0x6F: return "ld l,a";
+  case 0x68: return "ld l,b";
+  case 0x69: return "ld l,c";
+  case 0x6A: return "ld l,d";
+  case 0x6B: return "ld l,e";
+  case 0x6C: return "ld l,h";
+  case 0x6D: return "ld l,l";
+
+  case 0x7E: return "ld a,(hl)";
+  case 0x46: return "ld b,(hl)";
+  case 0x4E: return "ld c,(hl)";
+  case 0x56: return "ld d,(hl)";
+  case 0x5E: return "ld e,(hl)";
+  case 0x66: return "ld h,(hl)";
+  case 0x6E: return "ld l,(hl)";
+
+  case 0x77: return "ld (hl),a";
+  case 0x70: return "ld (hl),b";
+  case 0x71: return "ld (hl),c";
+  case 0x72: return "ld (hl),d";
+  case 0x73: return "ld (hl),e";
+  case 0x74: return "ld (hl),h";
+  case 0x75: return "ld (hl),l";
+
+  case 0x3E: sprintf(buf, "ld a,%02x", getpcb(z, 1)); return buf;
+  case 0x06: sprintf(buf, "ld b,%02x", getpcb(z, 1)); return buf;
+  case 0x0E: sprintf(buf, "ld c,%02x", getpcb(z, 1)); return buf;
+  case 0x16: sprintf(buf, "ld d,%02x", getpcb(z, 1)); return buf;
+  case 0x1E: sprintf(buf, "ld e,%02x", getpcb(z, 1)); return buf;
+  case 0x26: sprintf(buf, "ld h,%02x", getpcb(z, 1)); return buf;
+  case 0x2E: sprintf(buf, "ld l,%02x", getpcb(z, 1)); return buf;
+  case 0x36: sprintf(buf, "ld (hl),%02x", getpcb(z, 1)); return buf;
+
+  case 0x0A: return "ld a,(bc)";
+  case 0x1A: return "ld a,(de)";
+  case 0x3A: sprintf(buf, "ld a,(%04x)", getpcw(z, 1)); return buf;
+
+  case 0x02: return "ld (bc),a";
+
+  case 0x12: return "ld (de),a";
+
+  case 0x32: sprintf(buf, "ld (%04x), a", getpcw(z, 1)); return buf;
+
+  case 0x01: sprintf(buf, "ld bc,%04x", getpcw(z, 1)); return buf;
+  case 0x11: sprintf(buf, "ld de,%04x", getpcw(z, 1)); return buf;
+  case 0x21: sprintf(buf, "ld hl,%04x", getpcw(z, 1)); return buf;
+  case 0x31: sprintf(buf, "ld sp,%04x", getpcw(z, 1)); return buf;
+
+  case 0x2A: sprintf(buf, "ld hl,(%04x)", getpcw(z, 1)); return buf;
+
+  case 0x22: sprintf(buf, "ld (%04x),hl", getpcw(z, 1)); return buf;
+
+  case 0xF9: return "ld sp,hl";
+
+  case 0xEB: return "ex de,hl";
+
+  case 0xE3: return "ex (sp),hl";
+
+  case 0x87: return "add a,a";
+  case 0x80: return "add a,b";
+  case 0x81: return "add a,c";
+  case 0x82: return "add a,d";
+  case 0x83: return "add a,e";
+  case 0x84: return "add a,h";
+  case 0x85: return "add a,l";
+  case 0x86: return "add a,(hl)";
+  case 0xC6: sprintf(buf, "add a,%02x", getpcb(z, 1)); return buf;
+
+  case 0x8F: return "adc a,a";
+  case 0x88: return "adc a,b";
+  case 0x89: return "adc a,c";
+  case 0x8A: return "adc a,d";
+  case 0x8B: return "adc a,e";
+  case 0x8C: return "adc a,h";
+  case 0x8D: return "adc a,l";
+  case 0x8E: return "adc a,(hl)";
+  case 0xCE: sprintf(buf, "adc a,%02x", getpcb(z, 1)); return buf;
+
+  case 0x97: return "sub a,a";
+  case 0x90: return "sub a,b";
+  case 0x91: return "sub a,c";
+  case 0x92: return "sub a,d";
+  case 0x93: return "sub a,e";
+  case 0x94: return "sub a,h";
+  case 0x95: return "sub a,l";
+  case 0x96: return "sub a,(hl)";
+  case 0xD6: sprintf(buf, "sub a,%02x", getpcb(z, 1)); return buf;
+
+  case 0x9F: return "sbc a,a";
+  case 0x98: return "sbc a,b";
+  case 0x99: return "sbc a,c";
+  case 0x9A: return "sbc a,d";
+  case 0x9B: return "sbc a,e";
+  case 0x9C: return "sbc a,h";
+  case 0x9D: return "sbc a,l";
+  case 0x9E: return "sbc a,(hl)";
+  case 0xDE: sprintf(buf, "sbc a,%02x", getpcb(z, 1)); return buf;
+
+  case 0x09: return "add hl,bc";
+  case 0x19: return "add hl,de";
+  case 0x29: return "add hl,hl";
+  case 0x39: return "add hl,sp";
+
+  case 0xF3: return "di";
+  case 0xFB: return "ei";
+  case 0x00: return "nop";
+  case 0x76: return "halt";
+
+  case 0x3C: return "inc a";
+  case 0x04: return "inc b";
+  case 0x0C: return "inc c";
+  case 0x14: return "inc d";
+  case 0x1C: return "inc e";
+  case 0x24: return "inc h";
+  case 0x2C: return "inc l";
+  case 0x34: return "inc (hl)";
+
+  case 0x3D: return "dec a";
+  case 0x05: return "dec b";
+  case 0x0D: return "dec c";
+  case 0x15: return "dec d";
+  case 0x1D: return "dec e";
+  case 0x25: return "dec h";
+  case 0x2D: return "dec l";
+  case 0x35: return "dec (hl)";
+
+  case 0x03: return "inc bc";
+  case 0x13: return "inc de";
+  case 0x23: return "inc hl";
+  case 0x33: return "inc sp";
+
+  case 0x0B: return "dec bc";
+  case 0x1B: return "dec de";
+  case 0x2B: return "dec hl";
+  case 0x3B: return "dec sp";
+
+  case 0x27: return "daa";
+
+  case 0x2F: return "cpl";
+
+  case 0x37: return "scf";
+
+  case 0x3F: return "ccf";
+
+  case 0x07: return "rlca";
+
+  case 0x0F: return "rrca";
+
+  case 0x17: return "rla";
+
+  case 0x1F: return "rra";
+
+  case 0xA7: return "and a";
+  case 0xA0: return "and b";
+  case 0xA1: return "and c";
+  case 0xA2: return "and d";
+  case 0xA3: return "and e";
+  case 0xA4: return "and h";
+  case 0xA5: return "and l";
+  case 0xA6: return "and (hl)";
+  case 0xE6: sprintf(buf, "and %02x", getpcb(z, 1)); return buf;
+
+  case 0xAF: return "xor a";
+  case 0xA8: return "xor b";
+  case 0xA9: return "xor c";
+  case 0xAA: return "xor d";
+  case 0xAB: return "xor e";
+  case 0xAC: return "xor h";
+  case 0xAD: return "xor l";
+  case 0xAE: return "xor (hl)";
+  case 0xEE: sprintf(buf, "xor %02x", getpcb(z, 1)); return buf;
+
+  case 0xB7: return "or a";
+  case 0xB0: return "or b";
+  case 0xB1: return "or c";
+  case 0xB2: return "or d";
+  case 0xB3: return "or e";
+  case 0xB4: return "or h";
+  case 0xB5: return "or l";
+  case 0xB6: return "or (hl)";
+  case 0xF6: sprintf(buf, "or %02x", getpcb(z, 1)); return buf;
+
+  case 0xBF: return "cp a";
+  case 0xB8: return "cp b";
+  case 0xB9: return "cp c";
+  case 0xBA: return "cp d";
+  case 0xBB: return "cp e";
+  case 0xBC: return "cp h";
+  case 0xBD: return "cp l";
+  case 0xBE: return "cp (hl)";
+  case 0xFE: sprintf(buf, "cp %02x", getpcb(z, 1)); return buf;
+
+  case 0xC3: sprintf(buf, "jm %04x", getpcw(z, 1)); return buf;
+  case 0xC2: sprintf(buf, "jp nz, %04x", getpcw(z, 1)); return buf;
+  case 0xCA: sprintf(buf, "jp z, %04x", getpcw(z, 1)); return buf;
+  case 0xD2: sprintf(buf, "jp nc, %04x", getpcw(z, 1)); return buf;
+  case 0xDA: sprintf(buf, "jp c, %04x", getpcw(z, 1)); return buf;
+  case 0xE2: sprintf(buf, "jp po, %04x", getpcw(z, 1)); return buf;
+  case 0xEA: sprintf(buf, "jp pe, %04x", getpcw(z, 1)); return buf;
+  case 0xF2: sprintf(buf, "jp p, %04x", getpcw(z, 1)); return buf;
+  case 0xFA: sprintf(buf, "jp m, %04x", getpcw(z, 1)); return buf;
+
+  case 0x10: sprintf(buf, "djnz %02x", getpcb(z, 1)); return buf;
+  case 0x18: sprintf(buf, "jr %02x", getpcb(z, 1)); return buf;
+  case 0x20: sprintf(buf, "jr nz, %02x", getpcb(z, 1)); return buf;
+  case 0x28: sprintf(buf, "jr z, %02x", getpcb(z, 1)); return buf;
+  case 0x30: sprintf(buf, "jr nc, %02x", getpcb(z, 1)); return buf;
+  case 0x38: sprintf(buf, "jr c, %02x", getpcb(z, 1)); return buf;
+
+  case 0xE9: return "jp (hl)";
+  case 0xCD: sprintf(buf, "call %04x", getpcw(z, 1)); return buf;
+
+  case 0xC4: return "cnz";
+  case 0xCC: return "cz";
+  case 0xD4: return "cnc";
+  case 0xDC: return "cc";
+  case 0xE4: return "cpo";
+  case 0xEC: return "cpe";
+  case 0xF4: return "cp";
+  case 0xFC: return "cm";
+
+  case 0xC9: return "ret";
+  case 0xC0: return "ret nz";
+  case 0xC8: return "ret z";
+  case 0xD0: return "ret nc";
+  case 0xD8: return "ret c";
+  case 0xE0: return "ret po";
+  case 0xE8: return "ret pe";
+  case 0xF0: return "ret p";
+  case 0xF8: return "ret m";
+
+  case 0xC7: return "rst 0";
+  case 0xCF: return "rst 1";
+  case 0xD7: return "rst 2";
+  case 0xDF: return "rst 3";
+  case 0xE7: return "rst 4";
+  case 0xEF: return "rst 5";
+  case 0xF7: return "rst 6";
+  case 0xFF: return "rst 7";
+
+  case 0xC5: return "push bc";
+  case 0xD5: return "push de";
+  case 0xE5: return "push hl";
+  case 0xF5: return "push af";
+
+  case 0xC1: return "pop bc";
+  case 0xD1: return "pop de";
+  case 0xE1: return "pop hl";
+  case 0xF1: return "pop af";
+
+  case 0xDB: return "in a,(n)";
+
+  case 0xD3: return "out (n), a";
+
+  case 0x08: return "ex af,af'";
+  case 0xD9: return "exx";
+
+  case 0xCB: return "CB xx"; // fixme
+  case 0xED: return "ED xx"; // fixme
+  case 0xDD: return z80_disas_ddfd(z);
+  case 0xFD: return z80_disas_ddfd(z);
+  }
+  return "ILL";
+}
+
 // outputs to stdout a debug trace of the emulator
 Z80_EXPORT void z80_debug_output(z80* const z) {
   if (z) { }
-  /*printf("PC: %04X, AF: %04X, BC: %04X, DE: %04X, HL: %04X, SP: %04X, "
+  printf("PC: %04X, AF: %04X, BC: %04X, DE: %04X, HL: %04X, SP: %04X, "
          "IX: %04X, IY: %04X, I: %02X, R: %02X",
-      z->pc, (z->a << 8) | z->f, z->bc, z->de, z->hl, z->sp,
+      z->pc, z->af, z->bc, z->de, z->hl, z->sp,
       z->ix, z->iy, z->i, z->r);
 
-  printf("\t(%02X %02X %02X %02X), cyc: %lu\n", rb(z, z->pc), rb(z, z->pc + 1),
-      rb(z, z->pc + 2), rb(z, z->pc + 3), z->cyc);*/
+  printf("\t(%s %02X %02X %02X %02X)\n",
+      z80_disas(z),
+      rb(z, z->pc), rb(z, z->pc + 1),
+      rb(z, z->pc + 2), rb(z, z->pc + 3));
 }
+#else
+Z80_EXPORT void z80_debug_output(z80* const z) {
+  if (z) { }
+}
+#endif /* Z80_DEBUG */
 
 // function to call when an NMI is to be serviced
 Z80_EXPORT void z80_gen_nmi(z80* const z) {
