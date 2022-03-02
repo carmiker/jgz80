@@ -208,27 +208,57 @@ static inline unsigned cond_jr(z80* const z, bool condition) {
 }
 
 // ADD Byte: adds two bytes together
-static inline uint8_t addb(z80* const z, uint8_t a, uint8_t b, bool cy) {
+static inline uint8_t addb(z80* const z, uint32_t a, uint32_t b, bool cy) {
+/* as this is one of the core functions, the simple implementation
+   was replaced by an "unrolled" one. the basic algorithm is this
+   old code:
+
   const uint8_t result = a + b + cy;
-  z->f = 0 |
-    flag_val(sf, result >> 7) |
-    flag_val(zf, result == 0) |
+  z->f = (f_szpxy[result] & ~(1 << pf)) |
     flag_val(hf, carry(4, a, b, cy)) |
     flag_val(pf, carry(7, a, b, cy) != carry(8, a, b, cy)) |
     flag_val(cf, carry(8, a, b, cy)) |
-    flag_val(nf, 0) |
-    flag_val(xf, GET_BIT(3, result)) |
-    flag_val(yf, GET_BIT(5, result));
+    flag_val(nf, 0);
+  return result;
+*/
+  int32_t result = a + b + cy;
+  int32_t carry = result ^ a ^ b;
+  result &= 0xff;
+  z->f = (f_szpxy[result] & ~(1 << pf));
+  /* the carry flag we need (4th bit) is already in the right position
+     as hf is bit 4 too, so we don't need to shift it around */
+  z->f |= carry & (1 << hf);
+  /* we now need bits 7 and 8 of the carry - pf is set to one if bit7 != bit8.
+     we use the base algorithm (x+1) & 2 which results in 2 only if both low
+     bits aren't identical. in order to have the right bits in place, shift
+     by 6 and modulate the algorithm to work on the top 2 bits of the lower 3.*/
+  carry >>= 6;
+  z->f |= (carry+2) & 4;
+  /* cf is bit 0, so move the 8th bit of carry to that position. */
+  z->f |= (carry >> 2);
   return result;
 }
 
 // SUBstract Byte: substracts two bytes (with optional carry)
-static inline uint8_t subb(z80* const z, uint8_t a, uint8_t b, bool cy) {
+static inline uint8_t subb(z80* const z, uint32_t a, uint32_t b, bool cy) {
+/* like addb, this core functionality was "unrolled".
+   the simple original implemenation is this:
   uint8_t val = addb(z, a, ~b, !cy);
   flag_set(z, cf, !flag_get(z, cf));
   flag_set(z, hf, !flag_get(z, hf));
   flag_set(z, nf, 1);
   return val;
+  read the comments in addb to see explanations for the below new code.
+  */
+  int32_t result = a - b - cy;
+  int32_t carry = result ^ a ^ b;
+  result &= 0xff;
+  z->f = (1 << nf) | (f_szpxy[result] & ~(1 << pf));
+  z->f |= carry & (1 << hf);
+  carry >>= 6;
+  z->f |= ((carry+2) & 4);
+  z->f |= ((carry >> 2) & 1);
+  return result;
 }
 
 // ADD Word: adds two words together
@@ -345,14 +375,30 @@ static inline void lor(z80* const z, const uint8_t val) {
 }
 
 // compares a value with register A
-static inline void cp(z80* const z, const uint8_t val) {
+static inline void cp(z80* const z, const uint32_t val) {
+/* this core function was unrolled like subb and addb.
+   original implementation was:
   subb(z, z->a, val, 0);
-
   // the only difference between cp and sub is that
   // the xf/yf are taken from the value to be substracted,
   // not the result
   flag_set(z, yf, GET_BIT(5, val));
   flag_set(z, xf, GET_BIT(3, val));
+
+  because only 2 out of 5 flag of f_szpxy table would be
+  needed here, we instead calculate all of them from
+  scratch. see addb() comments for an explanation.
+*/
+  int32_t result = z->a - val;
+  int32_t carry = result ^ z->a ^ val;
+  z->f = (1 << nf) | /* nf always set */
+         (val & ((1 << xf) | (1 << yf))) | /* yf and xf is taken from val */
+         (result & (1 << sf)) | /* sf and zf from result */
+         ((!(result & 0xff)) << zf);
+  z->f |= carry & (1 << hf); /* adopt bit 4 directly from carry */
+  carry >>= 6;
+  z->f |= ((carry +2) & 4);
+  z->f |= ((carry >> 2) & 1);
 }
 
 // 0xCB opcodes
