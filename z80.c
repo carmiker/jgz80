@@ -498,10 +498,8 @@ static inline uint8_t cb_bit(z80* const z, uint8_t val, uint8_t n) {
   const uint8_t result = val & (1 << n);
   z->f = f_szpxy[result] |
     flag_val(cf, flag_get(z, cf)) | /* original code didn't set this one, so use old value */
-    flag_val(yf, GET_BIT(5, val)) |
     flag_val(hf, 1) |
-    flag_val(xf, GET_BIT(3, val)) |
-    flag_val(nf, 0);
+    flag_val(nf, 0); /* yf/xf are overwritten after return */
   return result;
 }
 
@@ -1914,6 +1912,9 @@ static unsigned exec_opcode_cb(z80* const z, uint8_t opcode) {
       flag_set(z, yf, GET_BIT(5, z->mem_ptr >> 8));
       flag_set(z, xf, GET_BIT(3, z->mem_ptr >> 8));
       cyc += 4;
+    } else {
+      flag_set(z, yf, GET_BIT(5, *reg));
+      flag_set(z, xf, GET_BIT(3, *reg));
     }
   } break;
   case 2: *reg &= ~(1 << y_); break; // RES y, r[z]
