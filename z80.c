@@ -759,6 +759,11 @@ static unsigned z80_step_s(z80* const z) {
   return cyc;
 }
 
+// sets the program counter (PC) to a new value
+Z80_EXPORT void z80_set_pc(z80* const z, uint16_t pc) {
+  z->pc = pc;
+}
+
 // executes the next instruction in memory + handles interrupts
 Z80_EXPORT unsigned z80_step(z80* const z) {
   return z80_step_s(z);
