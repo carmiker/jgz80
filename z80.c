@@ -1622,7 +1622,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
   case 0xFA: cyc += 10; cond_jump(z, flag_get(z, sf) == 1); break; // jp m, **
 
   case 0x10: cyc += 8; cyc += cond_jr(z, --z->b != 0); break; // djnz *
-  case 0x18: cyc += 12; z->pc += (int8_t) nextb(z); break; // jr *
+  case 0x18: cyc += 12; jr(z, nextb(z)); break; // jr *
   case 0x20: cyc += 7; cyc += cond_jr(z, flag_get(z, zf) == 0); break; // jr nz, *
   case 0x28: cyc += 7; cyc += cond_jr(z, flag_get(z, zf) == 1); break; // jr z, *
   case 0x30: cyc += 7; cyc += cond_jr(z, flag_get(z, cf) == 0); break; // jr nc, *
