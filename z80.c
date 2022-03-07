@@ -580,11 +580,16 @@ static void ind(z80* const z) {
 }
 
 static void outi(z80* const z) {
-  z->port_out(z, z->bc, rb(z, z->hl));
+  unsigned tmp = rb(z, z->hl), tmp2;
+  z->port_out(z, z->bc, tmp);
   ++z->hl;
   z->b -= 1;
-  flag_set(z, zf, z->b == 0);
-  flag_set(z, nf, 1);
+  z->f = f_szpxy[z->b];
+  flag_set(z, nf, GET_BIT(7, tmp));
+  tmp2 = tmp + z->l;
+  flag_set(z, pf, parity((tmp2 & 7) ^ z->b));
+  flag_set(z, hf, tmp2 > 255);
+  flag_set(z, cf, tmp2 > 255);
   z->mem_ptr = z->bc + 1;
 }
 
