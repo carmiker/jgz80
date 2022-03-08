@@ -599,6 +599,11 @@ static void outd(z80* const z) {
   z->mem_ptr = z->bc - 2;
 }
 
+static void outc(z80* const z, uint8_t data) {
+  z->port_out(z, z->bc, data);
+  z->mem_ptr = z->bc + 1;
+}
+
 static void daa(z80* const z) {
   // "When this instruction is executed, the A register is BCD corrected
   // using the  contents of the flags. The exact process is the following:
@@ -2129,18 +2134,14 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     }
     break; // indr
 
-  case 0x41: cyc += 12; z->port_out(z, z->bc, z->b); break; // out (c), b
-  case 0x49: cyc += 12; z->port_out(z, z->bc, z->c); break; // out (c), c
-  case 0x51: cyc += 12; z->port_out(z, z->bc, z->d); break; // out (c), d
-  case 0x59: cyc += 12; z->port_out(z, z->bc, z->e); break; // out (c), e
-  case 0x61: cyc += 12; z->port_out(z, z->bc, z->h); break; // out (c), h
-  case 0x69: cyc += 12; z->port_out(z, z->bc, z->l); break; // out (c), l
-  case 0x71: cyc += 12; z->port_out(z, z->bc, 0); break; // out (c), 0
-  case 0x79:
-    cyc += 12;
-    z->port_out(z, z->bc, z->a);
-    z->mem_ptr = z->bc + 1;
-    break; // out (c), a
+  case 0x79: cyc += 12; outc(z, z->a); break; // out (c), a
+  case 0x41: cyc += 12; outc(z, z->b); break; // out (c), b
+  case 0x49: cyc += 12; outc(z, z->c); break; // out (c), c
+  case 0x51: cyc += 12; outc(z, z->d); break; // out (c), d
+  case 0x59: cyc += 12; outc(z, z->e); break; // out (c), e
+  case 0x61: cyc += 12; outc(z, z->h); break; // out (c), h
+  case 0x69: cyc += 12; outc(z, z->l); break; // out (c), l
+  case 0x71: cyc += 12; outc(z, 0); break; // out (c), 0
 
   case 0xA3: cyc += 16; outi(z); break; // outi
   case 0xB3: {
