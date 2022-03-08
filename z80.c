@@ -1695,7 +1695,7 @@ static unsigned exec_opcode(z80* const z, uint8_t opcode) {
     cyc += 11;
     const uint16_t port = nextb(z) | (z->a << 8);
     z->port_out(z, port, z->a);
-    z->mem_ptr = (port + 1) | (z->a << 8);
+    z->mem_ptr = ((port + 1) & 0xff) | (z->a << 8);
   } break; // out (n), a
 
   case 0x08: {
