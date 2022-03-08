@@ -2150,6 +2150,7 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     if (z->b > 0) {
       z->pc -= 2;
       cyc += 5;
+      z->mem_ptr = z->pc + 1;
     }
   } break; // otir
   case 0xAB: cyc += 16; outd(z); break; // outd
@@ -2159,6 +2160,7 @@ static unsigned exec_opcode_ed(z80* const z, uint8_t opcode) {
     if (z->b > 0) {
       z->pc -= 2;
       cyc += 5;
+      z->mem_ptr = z->pc + 1;
     }
   } break; // otdr
 
