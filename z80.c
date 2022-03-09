@@ -564,13 +564,17 @@ static void in_r_c(z80* const z, uint8_t* r) {
 }
 
 static void ini(z80* const z) {
-  uint8_t val = z->port_in(z, z->bc);
-  wb(z, z->hl, val);
-  ++z->hl;
-  z->b -= 1;
-  flag_set(z, zf, z->b == 0);
-  flag_set(z, nf, 1);
+  unsigned tmp = z->port_in(z, z->bc);
+  unsigned tmp2 = tmp + ((z->c + 1) & 0xff);
   z->mem_ptr = z->bc + 1;
+  wb(z, z->hl, tmp);
+  ++z->hl;
+  --z->b;
+  z->f = (f_szpxy[z->b] & ~(1 << pf)) |
+    flag_val(nf, GET_BIT(7, tmp)) |
+    flag_val(pf, parity((tmp2 & 7) ^ z->b)) |
+    flag_val(hf, tmp2 > 255) |
+    flag_val(cf, tmp2 > 255);
 }
 
 static void ind(z80* const z) {
