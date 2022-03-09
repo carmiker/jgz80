@@ -1252,9 +1252,9 @@ static char* z80_disas(z80* const z) {
 Z80_EXPORT void z80_debug_output(z80* const z) {
   if (z) { }
   printf("PC: %04X, AF: %04X, BC: %04X, DE: %04X, HL: %04X, SP: %04X, "
-         "IX: %04X, IY: %04X, I: %02X, R: %02X",
+         "IX: %04X, IY: %04X, IR: %04X, WZ: %04X",
       z->pc, z->af, z->bc, z->de, z->hl, z->sp,
-      z->ix, z->iy, z->i, z->r);
+      z->ix, z->iy, (z->i << 8) | z->r, z->mem_ptr);
 
   printf("\t(%s %02X %02X %02X %02X)\n",
       z80_disas(z),
