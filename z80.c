@@ -123,11 +123,11 @@ static inline void inc_r(z80* const z) {
 
 // returns if there was a carry between bit "bit_no" and "bit_no - 1" when
 // executing "a + b + cy"
-static inline bool carry(int bit_no, uint16_t a, uint16_t b, bool cy) {
+/*static inline bool carry(int bit_no, uint16_t a, uint16_t b, bool cy) {
   int32_t result = a + b + cy;
   int32_t carry = result ^ a ^ b;
   return carry & (1 << bit_no);
-}
+}*/
 
 // returns the parity of byte: 0 if number of 1 bits in `val` is odd, else 1
 static inline bool parity(uint8_t v) {
