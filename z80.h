@@ -19,6 +19,11 @@
 #define Z80_EXPORT
 #endif
 
+enum {
+  Z80_PULSE = 1,
+  Z80_ASSERT = 2
+};
+
 typedef struct z80 z80;
 struct z80 {
   uint8_t (*read_byte)(void*, uint16_t);
@@ -40,10 +45,11 @@ struct z80 {
   uint8_t i, r; // interrupt vector, memory refresh
   uint8_t iff_delay;
   uint8_t interrupt_mode;
-  uint8_t int_data;
+  uint8_t irq_data;
+  uint8_t irq_pending;
+  uint8_t nmi_pending;
   bool iff1 : 1, iff2 : 1;
   bool halted : 1;
-  bool int_pending : 1, nmi_pending : 1;
 };
 
 Z80_EXPORT void z80_init(z80* const z);
@@ -53,8 +59,11 @@ Z80_EXPORT void z80_set_sp(z80* const z, uint16_t sp);
 Z80_EXPORT unsigned z80_step(z80* const z); /* return cycles used */
 Z80_EXPORT unsigned z80_step_n(z80* const z, unsigned cycles);
 Z80_EXPORT void z80_debug_output(z80* const z);
-Z80_EXPORT void z80_gen_nmi(z80* const z);
-Z80_EXPORT void z80_gen_int(z80* const z, uint8_t data);
-Z80_EXPORT void z80_clr_int(z80* const z);
+Z80_EXPORT void z80_assert_nmi(z80* const z);
+Z80_EXPORT void z80_pulse_nmi(z80* const z);
+Z80_EXPORT void z80_clr_nmi(z80* const z);
+Z80_EXPORT void z80_assert_irq(z80* const z, uint8_t data);
+Z80_EXPORT void z80_pulse_irq(z80* const z, uint8_t data);
+Z80_EXPORT void z80_clr_irq(z80* const z);
 
 #endif // Z80_Z80_H_

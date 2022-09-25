@@ -669,7 +669,7 @@ static inline unsigned process_interrupts(z80* const z) {
   }
 
   if (z->nmi_pending) {
-    z->nmi_pending = 0;
+    z->nmi_pending &= ~Z80_PULSE;
     z->halted = 0;
     z->iff1 = 0;
     inc_r(z);
@@ -679,8 +679,8 @@ static inline unsigned process_interrupts(z80* const z) {
     return cyc;
   }
 
-  if (z->int_pending && z->iff1) {
-    //z->int_pending = 0; // Commented when function to clear the line was added
+  if (z->irq_pending && z->iff1) {
+    z->irq_pending &= ~Z80_PULSE;
     z->halted = 0;
     z->iff1 = 0;
     z->iff2 = 0;
@@ -689,7 +689,7 @@ static inline unsigned process_interrupts(z80* const z) {
     switch (z->interrupt_mode) {
     case 0:
       cyc += 11;
-      cyc += exec_opcode(z, z->int_data);
+      cyc += exec_opcode(z, z->irq_data);
       break;
 
     case 1:
@@ -699,7 +699,7 @@ static inline unsigned process_interrupts(z80* const z) {
 
     case 2:
       cyc += 19;
-      call(z, rw(z, (z->i << 8) | z->int_data));
+      call(z, rw(z, (z->i << 8) | z->irq_data));
       break;
 
     default:
@@ -748,9 +748,9 @@ Z80_EXPORT void z80_init(z80* const z) {
   z->iff1 = 0;
   z->iff2 = 0;
   z->halted = 0;
-  z->int_pending = 0;
+  z->irq_pending = 0;
   z->nmi_pending = 0;
-  z->int_data = 0;
+  z->irq_data = 0;
 }
 
 Z80_EXPORT void z80_reset(z80* const z) {
@@ -1267,19 +1267,32 @@ Z80_EXPORT void z80_debug_output(z80* const z) {
 }
 #endif /* Z80_DEBUG */
 
-// function to call when an NMI is to be serviced
-Z80_EXPORT void z80_gen_nmi(z80* const z) {
-  z->nmi_pending = 1;
+// functions to call when an NMI is to be serviced
+Z80_EXPORT void z80_assert_nmi(z80* const z) {
+  z->nmi_pending |= Z80_ASSERT;
 }
 
-// function to call when an INT is to be serviced
-Z80_EXPORT void z80_gen_int(z80* const z, uint8_t data) {
-  z->int_pending = 1;
-  z->int_data = data;
+Z80_EXPORT void z80_pulse_nmi(z80* const z) {
+  z->nmi_pending |= Z80_PULSE;
 }
 
-Z80_EXPORT void z80_clr_int(z80* const z) {
-    z->int_pending = 0;
+Z80_EXPORT void z80_clr_nmi(z80* const z) {
+  z->nmi_pending = 0;
+}
+
+// functions to call when an INT is to be serviced
+Z80_EXPORT void z80_assert_irq(z80* const z, uint8_t data) {
+  z->irq_pending |= Z80_ASSERT;
+  z->irq_data = data;
+}
+
+Z80_EXPORT void z80_pulse_irq(z80* const z, uint8_t data) {
+  z->irq_pending |= Z80_PULSE;
+  z->irq_data = data;
+}
+
+Z80_EXPORT void z80_clr_irq(z80* const z) {
+    z->irq_pending = 0;
 }
 
 // executes a non-prefixed opcode
