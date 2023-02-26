@@ -7,12 +7,15 @@
 #define MEMORY_SIZE 0x10000
 static uint8_t* memory = NULL;
 static bool test_finished = 0;
+static long unsigned cyc = 0;
 
 static uint8_t rb(void* userdata, uint16_t addr) {
+  if (userdata) { }
   return memory[addr];
 }
 
 static void wb(void* userdata, uint16_t addr, uint8_t val) {
+  if (userdata) { }
   memory[addr] = val;
 }
 
@@ -44,7 +47,8 @@ static int load_file(const char* filename, uint16_t addr) {
   return 0;
 }
 
-static uint8_t in(z80* const z, uint8_t port) {
+static uint8_t in(z80* const z, uint16_t port) {
+  if (port) { }
   uint8_t operation = z->c;
 
   // print a character stored in E
@@ -62,7 +66,8 @@ static uint8_t in(z80* const z, uint8_t port) {
   return 0xFF;
 }
 
-static void out(z80* const z, uint8_t port, uint8_t val) {
+static void out(z80* const z, uint16_t port, uint8_t val) {
+  if (z || port || val) { }
   test_finished = 1;
 }
 
@@ -75,6 +80,7 @@ static int run_test(
   z->port_in = in;
   z->port_out = out;
   memset(memory, 0, MEMORY_SIZE);
+  cyc = 0;
 
   if (load_file(filename, 0x100) != 0) {
     return 1;
@@ -101,15 +107,15 @@ static int run_test(
     // warning: the following line will output dozens of GB of data.
     // z80_debug_output(z);
 
-    z80_step(z);
+    cyc += z80_step(z);
   }
 
-  long long diff = cyc_expected - z->cyc;
+  long long diff = cyc_expected - cyc;
   printf("\n*** %lu instructions executed on %lu cycles"
          " (expected=%lu, diff=%lld)\n\n",
-      nb_instructions, z->cyc, cyc_expected, diff);
+      nb_instructions, cyc, cyc_expected, diff);
 
-  return cyc_expected != z->cyc;
+  return cyc_expected != cyc;
 }
 
 int main(void) {
