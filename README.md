@@ -1,6 +1,9 @@
-# z80
+# The Jolly Good Z80
 
-A complete z80 emulator written in C99 under the MIT license. The emulator currently passes both zexdoc and zexall Z80 instruction exerciser tests. See `z80_tests.c` for example usage. Note that cycles are counted at instruction level.
+The Jolly Good Z80 is a fast and accurate instruction-stepped Z80 emulator written in C11.
+
+The emulator currently passes both zexdoc and zexall Z80 instruction tests.
+It has also been verified correct against VisualZ80.
 
 You can run the tests by running `make && ./z80_tests`, which outputs:
 
@@ -156,7 +159,9 @@ Tests complete
 
 ## Licensing
 
-This project is under the MIT license; except the files in `roms` which are provided for convenience to test the z80 core implementation. These files authors' and licenses can be seen in the source files (.z80/.src files).
+This project is under the MIT license, except the files in `roms` which are provided for convenience to test the z80 core implementation. These files authors' and licenses can be seen in the source files (.z80/.src files).
+
+This emulator is a hard fork of [superzazu/z80](https://github.com/superzazu/z80)
 
 ## Resources
 
