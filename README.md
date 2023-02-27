@@ -1,10 +1,21 @@
 # The Jolly Good Z80
 
-The Jolly Good Z80 is a fast and accurate instruction-stepped Z80 emulator written in C11.
+The Jolly Good Z80 is a fast and accurate Z80 emulator written in C11.
 
-The emulator currently passes both zexdoc and zexall Z80 instruction tests.
-It has also been verified correct against VisualZ80.
+This emulator passes both the ZEXDOC and ZEXALL Z80 instruction tests.
+It has also been verified correct against VisualZ80, and is known to run the
+entire ColecoVision, SG-1000, Master System, and Game Gear libraries.
+Additionally, it has been successfully integrated into Mega Drive/Genesis and
+Neo Geo emulators with unknown (but likely high or perfect) compatibility.
 
+## Licensing
+This project is licensed under the MIT license, except the files in `roms`
+which are provided for convenient testing of the Z80 core implementation. These
+files' authors and licenses may be seen in the source files.
+
+This emulator is a fork of [superzazu/z80](https://github.com/superzazu/z80)
+
+## Tests
 You can run the tests by running `make && ./z80_tests`, which outputs:
 
 ```
@@ -157,14 +168,7 @@ Tests complete
 *** 5764169747 instructions executed on 46734978649 cycles (expected=46734978649, diff=0)
 ```
 
-## Licensing
-
-This project is under the MIT license, except the files in `roms` which are provided for convenience to test the z80 core implementation. These files authors' and licenses can be seen in the source files (.z80/.src files).
-
-This emulator is a hard fork of [superzazu/z80](https://github.com/superzazu/z80)
-
 ## Resources
-
 - [Z80 CPU User Manual](http://z80.info/zip/z80cpu_um.pdf)
 - [Z80 instruction set (+ timings)](http://map.grauw.nl/resources/z80instr.php)
 - [Z80 timings](https://docs.google.com/spreadsheets/d/1eygwsPkhpBi6oLQI1mre7kxyN11o1j0TmvXCz1aBLLY/edit?usp=sharing)
