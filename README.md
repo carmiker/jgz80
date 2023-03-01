@@ -13,7 +13,9 @@ This project is licensed under the MIT license, except the files in `roms`
 which are provided for convenient testing of the Z80 core implementation. These
 files' authors and licenses may be seen in the source files.
 
-This emulator is a fork of [superzazu/z80](https://github.com/superzazu/z80)
+This emulator is a fork of [superzazu/z80](https://github.com/superzazu/z80).
+
+This emulator has been ported to Rust: [kirjavascript/z80](https://github.com/kirjavascript/z80).
 
 ## Tests
 You can run the tests by running `make && ./z80_tests`, which outputs:
