@@ -4,9 +4,9 @@ The Jolly Good Z80 is a fast and accurate Z80 emulator written in C11.
 
 This emulator passes both the ZEXDOC and ZEXALL Z80 instruction tests.
 It has also been verified correct against VisualZ80, and is known to run the
-entire ColecoVision, SG-1000, Master System, and Game Gear libraries.
-Additionally, it has been successfully integrated into Mega Drive/Genesis and
-Neo Geo emulators with unknown (but likely high or perfect) compatibility.
+entire ColecoVision, SG-1000, Master System, Game Gear, and Neo Geo libraries.
+Additionally, it has been successfully integrated into Mega Drive/Genesis
+emulators with unknown (but likely high or perfect) compatibility.
 
 ## Licensing
 This project is licensed under the MIT license, except the files in `roms`
